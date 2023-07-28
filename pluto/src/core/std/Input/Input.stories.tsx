@@ -10,6 +10,7 @@
 import { ReactElement, useState } from "react";
 
 import type { Meta } from "@storybook/react";
+import { Icon } from "@synnaxlabs/media";
 import { TimeStamp } from "@synnaxlabs/x";
 
 import { Input } from "@/core/std/Input";
@@ -22,7 +23,9 @@ const story: Meta<typeof Input> = {
 
 export const Basic = (): ReactElement => {
   const [value, setValue] = useState("");
-  return <Input value={value} onChange={setValue} />;
+  return (
+    <Input value={value} onChange={setValue} placeholder={<Icon.Add />} size="small" />
+  );
 };
 
 export const Time = (): ReactElement => {

@@ -18,6 +18,26 @@
     width: 100%;
 }
 
+.pluto-input__container {
+    position: relative;
+
+    & p {
+        color: var(--pluto-gray-m0);
+        position: absolute;
+        top: 50%;
+        left: 2rem;
+        transform: translateY(-50%);
+    }
+}
+
+.pluto-input__container--placeholder-centered {
+    & p {
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+}
+
 .pluto-input--outlined {
     border: var(--pluto-border);
 }
@@ -29,10 +49,6 @@
 .pluto-input--shadow:hover,
 .pluto-input--shadow:focus {
     border: var(--pluto-border);
-}
-
-.pluto-input::placeholder {
-    color: var(--pluto-gray-m0);
 }
 
 .pluto-input.pluto--medium {

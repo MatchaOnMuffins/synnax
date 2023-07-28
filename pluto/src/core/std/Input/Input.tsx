@@ -7,16 +7,17 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-import { forwardRef } from "react";
+import { ReactNode, forwardRef } from "react";
 
 import { CSS } from "@/core/css";
 import { InputBaseProps } from "@/core/std/Input/types";
 
 import "@/core/std/Input/Input.css";
 
-export interface InputProps extends InputBaseProps<string> {
+export interface InputProps extends Omit<InputBaseProps<string>, "placeholder"> {
   selectOnFocus?: boolean;
   centerPlaceholder?: boolean;
+  placeholder?: ReactNode;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -30,27 +31,35 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       selectOnFocus = false,
       centerPlaceholder = false,
       variant = "outlined",
+      placeholder,
       ...props
     },
     ref
   ) => (
-    <input
-      ref={ref}
-      value={value}
+    <div
       className={CSS(
-        CSS.B("input"),
-        CSS.size(size),
-        CSS.BM("input", variant),
-        centerPlaceholder && CSS.BM("input", "placeholder-centered"),
-        className
+        CSS.BE("input", "container"),
+        centerPlaceholder && CSS.BEM("input", "container", "placeholder-centered")
       )}
-      onChange={(e) => onChange(e.target.value)}
-      onFocus={(e) => {
-        if (selectOnFocus) e.target.select();
-        onFocus?.(e);
-      }}
-      {...props}
-    />
+    >
+      {value.length === 0 && <p>{placeholder}</p>}
+      <input
+        ref={ref}
+        value={value}
+        className={CSS(
+          CSS.B("input"),
+          CSS.size(size),
+          CSS.BM("input", variant),
+          className
+        )}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) => {
+          if (selectOnFocus) e.target.select();
+          onFocus?.(e);
+        }}
+        {...props}
+      />
+    </div>
   )
 );
 Input.displayName = "Input";

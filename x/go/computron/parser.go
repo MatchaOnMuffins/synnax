@@ -1,7 +1,7 @@
-package main
+package computron
 
 import (
-	"bufio"
+	// "bufio"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -13,27 +13,42 @@ import (
 
 const PROMPT = "Enter a Math expression "
 
-func main() {
-	scanner := bufio.NewScanner(os.Stdin)
+// func main() {
+// 	scanner := bufio.NewScanner(os.Stdin)
 
-	for {
-		fmt.Printf(PROMPT)
-		scanned := scanner.Scan()
-		if !scanned {
-			return
-		}
+// 	for {
+// 		fmt.Printf(PROMPT)
+// 		scanned := scanner.Scan()
+// 		if !scanned {
+// 			return
+// 		}
 
-		line := scanner.Text()
-		exp, err := parser.ParseExpr(line)
-		if err != nil {
-			fmt.Printf("parsing failed: %s\n", err)
-			return
-		}
-		printer.Fprint(os.Stdout, token.NewFileSet(), exp)
-		fmt.Printf("\n")
-		fmt.Printf("%f\n", Eval(exp))
-		ast.Print(token.NewFileSet(), exp)
+// 		line := scanner.Text()
+// 		exp, err := parser.ParseExpr(line)
+// 		if err != nil {
+// 			fmt.Printf("parsing failed: %s\n", err)
+// 			return
+// 		}
+// 		printer.Fprint(os.Stdout, token.NewFileSet(), exp)
+// 		fmt.Printf("\n")
+// 		fmt.Printf("%f\n", Eval(exp))
+// 		ast.Print(token.NewFileSet(), exp)
+// 	}
+// }
+
+func BeginParse(line string) float64{
+	// line := scanner.Text()
+	exp, err := parser.ParseExpr(line)
+	if err != nil {
+		fmt.Printf("parsing failed: %s\n", err)
+		return -1
 	}
+	printer.Fprint(os.Stdout, token.NewFileSet(), exp)
+	fmt.Printf("\n")
+	// fmt.Printf("%f\n", Eval(exp))
+	return Eval(exp)
+	// ast.Print(token.NewFileSet(), exp)
+
 }
 
 func Eval(exp ast.Expr) float64 {

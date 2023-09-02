@@ -11,110 +11,107 @@ package cesium
 
 import (
 	"context"
-
+	"github.com/synnaxlabs/cesium/internal/core"
 	"github.com/synnaxlabs/cesium/internal/unary"
-	"github.com/synnaxlabs/x/confluence"
-	"github.com/synnaxlabs/x/signal"
+	"github.com/synnaxlabs/x/errutil"
 	"github.com/synnaxlabs/x/telem"
-	"go.uber.org/zap"
 )
 
 const AutoSpan = unary.AutoSpan
 
-type Iterator struct {
-	inlet    confluence.Inlet[IteratorRequest]
-	outlet   confluence.Outlet[IteratorResponse]
-	frame    Frame
-	shutdown context.CancelFunc
-	wg       signal.WaitGroup
-	logger   *zap.Logger
+type IteratorConfig struct {
+	Bounds   telem.TimeRange
+	Channels []core.ChannelKey
 }
 
-func wrapStreamIterator(wrap *streamIterator) *Iterator {
-	ctx, cancel := signal.Isolated()
-	req, res := confluence.Attach[IteratorRequest, IteratorResponse](wrap, 1)
-	wrap.Flow(ctx)
-	return &Iterator{
-		inlet:    req,
-		outlet:   res,
-		shutdown: cancel,
-		wg:       ctx,
+type Iterator struct {
+	internal []*unary.Iterator
+}
+
+func (db *DB) NewIterator(cfg IteratorConfig) (*Iterator, error) {
+	internal := make([]*unary.Iterator, len(cfg.Channels))
+	for i, key := range cfg.Channels {
+		uDB, err := db.getUnary(key)
+		if err != nil {
+			return nil, err
+		}
+		internal[i] = uDB.NewIterator(unary.IteratorConfig{Bounds: cfg.Bounds})
 	}
+	return &Iterator{internal: internal}, nil
 }
 
 // Next reads all data occupying the next span of time, returning true
-// if the iterator has not been exhausted and has not accumulated an error.
-func (i *Iterator) Next(span telem.TimeSpan) bool {
-	return i.exec(IteratorRequest{Command: IterNext, Span: span})
+// if the iterator has not been exhausted and has not accumulated an Error.
+func (i *Iterator) Next(ctx context.Context, span telem.TimeSpan) bool {
+	return i.exec(func(it *unary.Iterator) bool { return it.Next(ctx, span) })
 }
 
 // Prev implements Iterator.
-func (i *Iterator) Prev(span telem.TimeSpan) bool {
-	return i.exec(IteratorRequest{Command: IterPrev, Span: span})
+func (i *Iterator) Prev(ctx context.Context, span telem.TimeSpan) bool {
+	return i.exec(func(it *unary.Iterator) bool { return it.Prev(ctx, span) })
 }
 
 // SeekFirst implements Iterator.
-func (i *Iterator) SeekFirst() bool {
-	return i.exec(IteratorRequest{Command: IterSeekFirst})
+func (i *Iterator) SeekFirst(ctx context.Context) bool {
+	return i.exec(func(it *unary.Iterator) bool { return it.SeekFirst(ctx) })
 }
 
 // SeekLast implements Iterator.
-func (i *Iterator) SeekLast() bool {
-	return i.exec(IteratorRequest{Command: IterSeekLast})
+func (i *Iterator) SeekLast(ctx context.Context) bool {
+	return i.exec(func(it *unary.Iterator) bool { return it.SeekLast(ctx) })
 }
 
 // SeekLE implements Iterator.
-func (i *Iterator) SeekLE(ts telem.TimeStamp) bool {
-	return i.exec(IteratorRequest{Command: IterSeekLE, Stamp: ts})
+func (i *Iterator) SeekLE(ctx context.Context, ts telem.TimeStamp) bool {
+	return i.exec(func(it *unary.Iterator) bool { return it.SeekLE(ctx, ts) })
 }
 
 // SeekGE implements Iterator.
-func (i *Iterator) SeekGE(ts telem.TimeStamp) bool {
-	return i.exec(IteratorRequest{Command: IterSeekGE, Stamp: ts})
+func (i *Iterator) SeekGE(ctx context.Context, ts telem.TimeStamp) bool {
+	return i.exec(func(it *unary.Iterator) bool { return it.SeekGE(ctx, ts) })
 }
 
-// Error implements Iterator.
 func (i *Iterator) Error() error {
-	_, err := i.execErr(IteratorRequest{Command: IterError})
-	return err
+	for _, i := range i.internal {
+		if err := i.Error(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Valid implements Iterator.
 func (i *Iterator) Valid() bool {
-	ok, _ := i.execErr(IteratorRequest{Command: IterValid})
-	return ok
+	return i.exec(func(it *unary.Iterator) bool { return it.Valid() })
 }
 
 // SetBounds implements Iterator.
 func (i *Iterator) SetBounds(bounds telem.TimeRange) {
-	i.exec(IteratorRequest{Command: IterSetBounds, Bounds: bounds})
+	i.exec(func(it *unary.Iterator) bool { it.SetBounds(bounds); return true })
 }
 
 // Value implements Iterator.
-func (i *Iterator) Value() Frame { return i.frame }
-
-// Close implements Iterator.
-func (i *Iterator) Close() error {
-	i.inlet.Close()
-	err := i.wg.Wait()
-	i.shutdown()
-	return err
-}
-
-func (i *Iterator) exec(req IteratorRequest) bool {
-	ok, _ := i.execErr(req)
-	return ok
-}
-
-func (i *Iterator) execErr(req IteratorRequest) (bool, error) {
-	i.frame = Frame{}
-	i.inlet.Inlet() <- req
-	for res := range i.outlet.Outlet() {
-		if res.Variant == IteratorAckResponse {
-			return res.Ack, res.Err
-		}
-		i.frame = i.frame.AppendFrame(res.Frame)
+func (i *Iterator) Value() Frame {
+	fr := Frame{}
+	for _, i := range i.internal {
+		fr = fr.AppendFrame(i.Value())
 	}
-	i.logger.DPanic(unexpectedSteamClosure)
-	return false, nil
+	return fr
+}
+
+func (i *Iterator) exec(f func(i *unary.Iterator) bool) (ok bool) {
+	for _, i := range i.internal {
+		if f(i) {
+			ok = true
+		}
+	}
+	return
+}
+
+func (i *Iterator) Close() error {
+	c := errutil.NewCatch(errutil.WithAggregation())
+	for _, i := range i.internal {
+		c.Exec(i.Close)
+	}
+	return c.Error()
 }

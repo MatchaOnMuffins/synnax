@@ -11,6 +11,7 @@ package ts
 import (
 	"github.com/synnaxlabs/alamos"
 	"github.com/synnaxlabs/cesium"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/config"
 	xfs "github.com/synnaxlabs/x/io/fs"
 	"github.com/synnaxlabs/x/override"
@@ -24,20 +25,12 @@ type (
 	ChannelKey           = cesium.ChannelKey
 	WriterConfig         = cesium.WriterConfig
 	Writer               = cesium.Writer
-	StreamWriter         = cesium.StreamWriter
-	WriterRequest        = cesium.WriterRequest
-	WriterResponse       = cesium.WriterResponse
-	WriterCommand        = cesium.WriterCommand
 	IteratorConfig       = cesium.IteratorConfig
 	Iterator             = cesium.Iterator
-	StreamIterator       = cesium.StreamIterator
-	IteratorRequest      = cesium.IteratorRequest
-	IteratorResponse     = cesium.IteratorResponse
-	IteratorCommand      = cesium.IteratorCommand
-	StreamReader         = cesium.Streamer
-	StreamReaderConfig   = cesium.StreamerConfig
-	StreamReaderRequest  = cesium.StreamerRequest
-	StreamReaderResponse = cesium.StreamerResponse
+	StreamReader         = framer.Streamer
+	StreamReaderConfig   = framer.StreamerConfig
+	StreamReaderRequest  = framer.StreamerRequest
+	StreamReaderResponse = framer.StreamerResponse
 )
 
 const AutoSpan = cesium.AutoSpan

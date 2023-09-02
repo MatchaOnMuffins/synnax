@@ -7,9 +7,10 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-package cesium
+package framer
 
 import (
+	"github.com/synnaxlabs/cesium"
 	"io"
 
 	"github.com/synnaxlabs/x/address"
@@ -18,15 +19,15 @@ import (
 )
 
 type relay struct {
-	delta    *confluence.DynamicDeltaMultiplier[Frame]
-	inlet    confluence.Inlet[Frame]
+	delta    *confluence.DynamicDeltaMultiplier[cesium.Frame]
+	inlet    confluence.Inlet[cesium.Frame]
 	shutdown io.Closer
 }
 
-func newRelay(o *options) *relay {
-	sCtx, cancel := signal.Isolated(signal.WithInstrumentation(o.Instrumentation))
-	delta := confluence.NewDynamicDeltaMultiplier[Frame]()
-	frames := confluence.NewStream[Frame](1)
+func newRelay(o *relay) *relay {
+	sCtx, cancel := signal.Isolated(signal.WithInstrumentation())
+	delta := confluence.NewDynamicDeltaMultiplier[cesium.Frame]()
+	frames := confluence.NewStream[cesium.Frame](1)
 	delta.InFrom(frames)
 	delta.Flow(sCtx)
 	return &relay{
@@ -36,15 +37,15 @@ func newRelay(o *options) *relay {
 	}
 }
 
-func (r *relay) connect(buffer int) (confluence.Outlet[Frame], func()) {
-	frames := confluence.NewStream[Frame](buffer)
+func (r *relay) connect(buffer int) (confluence.Outlet[cesium.Frame], func()) {
+	frames := confluence.NewStream[cesium.Frame](buffer)
 	frames.SetInletAddress(address.Rand())
 	r.delta.Connect(frames)
 	return frames, func() {
 		r.delta.Disconnect(frames)
 		// We need to make sure we drain any remaining frames before exiting to
 		// avoid blocking the relay.
-		confluence.Drain[Frame](frames)
+		confluence.Drain[cesium.Frame](frames)
 	}
 }
 

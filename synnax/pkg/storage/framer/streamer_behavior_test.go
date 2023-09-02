@@ -7,7 +7,7 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-package cesium_test
+package framer_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -22,25 +22,25 @@ import (
 
 var _ = Describe("Streamer Behavior", Ordered, func() {
 	var db *cesium.DB
-	BeforeAll(func() { db = openMemDB() })
+	BeforeAll(func() { db = cesium.openMemDB() })
 	AfterAll(func() { Expect(db.Close()).To(Succeed()) })
 	Describe("Happy Path", func() {
 		It("Should subscribe to written frames for the given channels", func() {
 			var basic1 cesium.ChannelKey = 1
 			By("Creating a channel")
 			Expect(db.CreateChannel(
-				ctx,
+				cesium.ctx,
 				cesium.Channel{Key: basic1, DataType: telem.Int64T, Rate: 1 * telem.Hz},
 			)).To(Succeed())
-			w := MustSucceed(db.NewWriter(ctx, cesium.WriterConfig{
+			w := MustSucceed(db.NewWriter(cesium.ctx, cesium.WriterConfig{
 				Channels: []cesium.ChannelKey{basic1},
 				Start:    10 * telem.SecondTS,
 			}))
-			r := MustSucceed(db.NewStreamer(ctx, cesium.StreamerConfig{
+			r := MustSucceed(db.NewStreamer(cesium.ctx, StreamerConfig{
 				Channels: []cesium.ChannelKey{basic1},
 			}))
 			i, o := confluence.Attach(r, 1)
-			sCtx, cancel := signal.WithCancel(ctx)
+			sCtx, cancel := signal.WithCancel(cesium.ctx)
 			defer cancel()
 			r.Flow(sCtx, confluence.CloseInletsOnExit())
 

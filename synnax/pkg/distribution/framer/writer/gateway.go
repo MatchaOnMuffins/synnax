@@ -20,7 +20,7 @@ import (
 
 // newGateway opens a new StreamWriter that writes to the store on the gateway node.
 func (s *Service) newGateway(ctx context.Context, cfg Config) (StreamWriter, error) {
-	w, err := s.TS.NewStreamWriter(ctx, cfg.toStorage())
+	w, err := s.TS.OpenWriter(ctx, cfg.toStorage())
 	if err != nil {
 		return nil, err
 	}

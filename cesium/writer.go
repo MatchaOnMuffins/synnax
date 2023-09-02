@@ -10,12 +10,16 @@
 package cesium
 
 import (
+	"context"
 	"github.com/cockroachdb/errors"
 	"github.com/synnaxlabs/cesium/internal/core"
+	"github.com/synnaxlabs/cesium/internal/domain"
+	"github.com/synnaxlabs/cesium/internal/index"
+	"github.com/synnaxlabs/cesium/internal/unary"
 	"github.com/synnaxlabs/x/confluence"
-	"github.com/synnaxlabs/x/signal"
+	"github.com/synnaxlabs/x/errutil"
 	"github.com/synnaxlabs/x/telem"
-	"go.uber.org/zap"
+	"github.com/synnaxlabs/x/validate"
 )
 
 type WriterConfig struct {
@@ -24,75 +28,164 @@ type WriterConfig struct {
 }
 
 type Writer struct {
-	requests          confluence.Inlet[WriterRequest]
-	responses         confluence.Outlet[WriterResponse]
-	wg                signal.WaitGroup
-	logger            *zap.Logger
-	hasAccumulatedErr bool
+	WriterConfig
+	// internal contains writers for each channel
+	internal map[core.ChannelKey]unary.Writer
+	// writingToIdx is true when the Write is writing to the index
+	// channel. This is typically true, which allows us to avoid
+	// unnecessary lookups.
+	writingToIdx bool
+	idx          struct {
+		index.Index
+		key           core.ChannelKey
+		highWaterMark telem.TimeStamp
+	}
+	sampleCount int64
+	seqNum      int
+	err         error
+	relay       confluence.Inlet[Frame]
 }
 
-const unexpectedSteamClosure = "[cesium] - unexpected early closure of response stream"
-
-func wrapStreamWriter(internal StreamWriter) *Writer {
-	sCtx, _ := signal.Isolated()
-	req := confluence.NewStream[WriterRequest](1)
-	res := confluence.NewStream[WriterResponse](1)
-	internal.InFrom(req)
-	internal.OutTo(res)
-	internal.Flow(
-		sCtx,
-		confluence.CloseInletsOnExit(),
+func (db *DB) NewWriter(ctx context.Context, cfg WriterConfig) (*Writer, error) {
+	var (
+		idx          index.Index
+		writingToIdx bool
+		idxChannel   Channel
+		internal     = make(map[core.ChannelKey]unary.Writer, len(cfg.Channels))
 	)
-	return &Writer{requests: req, responses: res, wg: sCtx}
+	for i, key := range cfg.Channels {
+		u, ok := db.dbs[key]
+		if !ok {
+			return nil, ChannelNotFound
+		}
+		if u.Channel.IsIndex {
+			writingToIdx = true
+		}
+		if i == 0 {
+			if u.Channel.Index != 0 {
+				idxU, err := db.getUnary(u.Channel.Index)
+				if err != nil {
+					return nil, err
+				}
+				idx = &index.Domain{DB: idxU.Ranger, Instrumentation: db.Instrumentation}
+				idxChannel = idxU.Channel
+			} else {
+				idx = index.Rate{Rate: u.Channel.Rate}
+				idxChannel = u.Channel
+			}
+		} else {
+			if err := validateSameIndex(u.Channel, idxChannel); err != nil {
+				return nil, err
+			}
+		}
+		w, err := u.NewWriter(ctx, domain.WriterConfig{Start: cfg.Start})
+		if err != nil {
+			return nil, err
+		}
+		internal[key] = *w
+	}
+
+	w := &Writer{internal: internal, relay: db.relay.inlet}
+	w.Start = cfg.Start
+	w.idx.key = idxChannel.Key
+	w.writingToIdx = writingToIdx
+	w.idx.highWaterMark = cfg.Start
+	w.idx.Index = idx
+	return w, nil
 }
 
-func (w *Writer) Write(frame Frame) bool {
-	if w.hasAccumulatedErr {
-		return false
-	}
-	select {
-	case <-w.responses.Outlet():
-		w.hasAccumulatedErr = true
-		return false
-	case w.requests.Inlet() <- WriterRequest{Frame: frame, Command: WriterWrite}:
-		return true
-	}
-}
-
-func (w *Writer) Commit() (telem.TimeStamp, bool) {
-	if w.hasAccumulatedErr {
-		return 0, false
-	}
-	select {
-	case <-w.responses.Outlet():
-		w.hasAccumulatedErr = true
-		return 0, false
-	case w.requests.Inlet() <- WriterRequest{Command: WriterCommit}:
-	}
-	for res := range w.responses.Outlet() {
-		if res.Command == WriterCommit {
-			return res.End, res.Ack
+func validateSameIndex(chOne, chTwo Channel) error {
+	if chOne.Index == 0 && chTwo.Index == 0 {
+		if chOne.Rate != chTwo.Rate {
+			return errors.Wrapf(validate.Error, "channels must have the same rate")
 		}
 	}
-	w.logger.DPanic(unexpectedSteamClosure)
-	return 0, false
+	if chOne.Index != chTwo.Index {
+		return errors.Wrapf(validate.Error, "channels must have the same index")
+	}
+	return nil
 }
 
-func (w *Writer) Error() error {
-	w.requests.Inlet() <- WriterRequest{Command: WriterError}
-	for res := range w.responses.Outlet() {
-		if res.Command == WriterError {
-			w.hasAccumulatedErr = false
-			return res.Err
+func (w *Writer) Write(fr Frame) error {
+	if !fr.Even() {
+		return errors.Wrapf(validate.Error, "cannot Write uneven frame")
+	}
+
+	if !fr.Unary() {
+		return errors.Wrapf(validate.Error, "cannot Write frame with duplicate channels")
+	}
+
+	if len(fr.Keys) != len(w.internal) {
+		return errors.Wrapf(validate.Error, "cannot Write frame without data for all channels")
+	}
+
+	w.sampleCount += fr.Len()
+
+	for i, series := range fr.Series {
+		key := fr.Key(i)
+		_chW, ok := w.internal[fr.Keys[i]]
+		if !ok {
+			return errors.Wrapf(
+				validate.Error,
+				"cannot Write array for channel %s that was not specified when opening the Writer",
+				key,
+			)
+		}
+
+		chW := &_chW
+
+		if w.writingToIdx && w.idx.key == key {
+			if err := w.updateHighWater(series); err != nil {
+				return err
+			}
+		}
+
+		if err := chW.Write(series); err != nil {
+			return err
 		}
 	}
-	w.logger.DPanic(unexpectedSteamClosure)
-	return errors.New(unexpectedSteamClosure)
+
+	return nil
 }
 
-func (w *Writer) Close() (err error) {
-	w.requests.Close()
-	for range w.responses.Outlet() {
+func (w *Writer) Commit(ctx context.Context) (telem.TimeStamp, error) {
+	end, err := w.resolveCommitEnd(ctx)
+	if err != nil {
+		return end.Lower, err
 	}
-	return w.wg.Wait()
+	// because the range is exclusive, we need to add 1 nanosecond to the end
+	end.Lower++
+	c := errutil.NewCatch(errutil.WithAggregation())
+	for _, chW := range w.internal {
+		c.Exec(func() error { return chW.CommitWithEnd(ctx, end.Lower) })
+	}
+	return end.Lower, c.Error()
+}
+
+func (w *Writer) Close() error {
+	c := errutil.NewCatch(errutil.WithAggregation())
+	for _, chW := range w.internal {
+		c.Exec(chW.Close)
+	}
+	return errors.CombineErrors(w.err, c.Error())
+}
+
+func (w *Writer) updateHighWater(col telem.Series) error {
+	if col.DataType != telem.TimeStampT && col.DataType != telem.Int64T {
+		return errors.Wrapf(
+			validate.Error,
+			"invalid data type for channel %s, expected %s, got %s",
+			w.idx.key, telem.TimeStampT,
+			col.DataType,
+		)
+	}
+	w.idx.highWaterMark = telem.ValueAt[telem.TimeStamp](col, col.Len()-1)
+	return nil
+}
+
+func (w *Writer) resolveCommitEnd(ctx context.Context) (index.TimeStampApproximation, error) {
+	if w.writingToIdx {
+		return index.Exactly(w.idx.highWaterMark), nil
+	}
+	return w.idx.Stamp(ctx, w.Start, w.sampleCount-1, true)
 }

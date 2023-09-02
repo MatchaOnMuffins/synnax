@@ -77,7 +77,7 @@ var _ = Describe("Accuracy", Ordered, func() {
 				idxKey cesium.ChannelKey = 3
 				first                    = []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 				second                   = []int64{13, 14, 15, 16, 17, 18, 19, 20, 21, 22}
-				// Converted to seconds on write
+				// Converted to seconds on Write
 				firstTS  = []telem.TimeStamp{2, 4, 6, 8, 10, 12, 13, 17, 18, 20}
 				secondTS = []telem.TimeStamp{22, 24, 29, 32, 33, 34, 35, 36, 38, 40}
 			)
@@ -227,7 +227,7 @@ var _ = Describe("Accuracy", Ordered, func() {
 					key2    cesium.ChannelKey = 9
 					data1                     = []int64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 					data2                     = []int64{11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-					// converted to seconds on write
+					// converted to seconds on Write
 					idxData1 = []telem.TimeStamp{1, 3, 5, 7, 9, 11, 18, 22, 31, 35}
 					idxData2 = []telem.TimeStamp{1, 2, 6, 7, 12, 14, 17, 21, 27, 33}
 				)

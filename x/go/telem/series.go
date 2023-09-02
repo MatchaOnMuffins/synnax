@@ -18,9 +18,11 @@ type Series struct {
 	DataType DataType `json:"data_type" msgpack:"data_type"`
 	// Data is the underlying binary buffer.
 	Data []byte `json:"data" msgpack:"data"`
+	// Alignment
+	Alignment int64
 }
 
-// Len returns the the number of samples currently in the Series.
+// Len returns the number of samples currently in the Series.
 func (s Series) Len() int64 { return s.DataType.Density().SampleCount(s.Size()) }
 
 // Size returns the number of bytes in the Series.

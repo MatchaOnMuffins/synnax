@@ -7,10 +7,11 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-package cesium
+package framer
 
 import (
 	"context"
+	"github.com/synnaxlabs/cesium"
 	"github.com/synnaxlabs/cesium/internal/core"
 	"github.com/synnaxlabs/x/confluence"
 	"github.com/synnaxlabs/x/signal"
@@ -34,23 +35,23 @@ type StreamerConfig struct {
 // subscribed to.
 type StreamerResponse struct {
 	// Frame is the frame containing the channel data.
-	Frame Frame
+	Frame cesium.Frame
 }
 
-// Streamer allows the caller to tap into the DB's write pipeline using a confluence
+// Streamer allows the caller to tap into the DB's Write pipeline using a confluence
 // Segment based interface. To use a Streamer, call DB.NewStreamer with a list
 // of channels whose series you'd like to receive. Then, call Streamer.Flow to start
 // receiving frames.
 //
-// Streamer must be used carefully, as it can clog the write pipeline if the caller
+// Streamer must be used carefully, as it can clog the Write pipeline if the caller
 // does not receive the incoming frames fast enough. It's recommended that you use a
 // buffered channel for the readers output.
 //
 // Issuing a new StreamerRequest updates the set of channels the stream reader
 // subscribes to.
 //
-// To stop receiving values, simply close the inlet of the reader. The reader will then
-// gracefully exit and close its output channel.
+// To stop receiving values, simply Close the inlet of the reader. The reader will then
+// gracefully exit and Close its output channel.
 type Streamer = confluence.Segment[StreamerRequest, StreamerResponse]
 
 // NewStreamer opens a new Streamer using the given configuration. To start
@@ -60,7 +61,6 @@ type Streamer = confluence.Segment[StreamerRequest, StreamerResponse]
 func (db *DB) NewStreamer(ctx context.Context, cfg StreamerConfig) (Streamer, error) {
 	return &streamer{
 		StreamerConfig: cfg,
-		relay:          db.relay,
 	}, nil
 }
 

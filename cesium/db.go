@@ -40,22 +40,27 @@ func NewFrame(keys []core.ChannelKey, series []telem.Series) Frame {
 
 type DB struct {
 	*options
-	relay *relay
-	mu    sync.RWMutex
-	dbs   map[uint32]unary.DB
+	mu  sync.RWMutex
+	dbs map[uint32]unary.DB
 }
 
 // Write implements DB.
-func (db *DB) Write(ctx context.Context, start telem.TimeStamp, frame Frame) error {
-	_, span := db.T.Debug(ctx, "write")
+func (db *DB) Write(ctx context.Context, start telem.TimeStamp, frame Frame) (err error) {
+	_, span := db.T.Debug(ctx, "Write")
 	defer span.End()
 	w, err := db.NewWriter(ctx, WriterConfig{Start: start, Channels: frame.Keys})
 	if err != nil {
 		return err
 	}
-	w.Write(frame)
-	w.Commit()
-	return w.Close()
+	defer func() {
+		err = errors.CombineErrors(err, w.Close())
+	}()
+
+	if err := w.Write(frame); err != nil {
+		return err
+	}
+	_, err = w.Commit(ctx)
+	return err
 }
 
 // WriteArray implements DB.
@@ -70,10 +75,10 @@ func (db *DB) Read(ctx context.Context, tr telem.TimeRange, keys ...core.Channel
 		return
 	}
 	defer func() { err = iter.Close() }()
-	if !iter.SeekFirst() {
+	if !iter.SeekFirst(ctx) {
 		return
 	}
-	for iter.Next(telem.TimeSpanMax) {
+	for iter.Next(ctx, telem.TimeSpanMax) {
 		frame = frame.AppendFrame(iter.Value())
 	}
 	return
@@ -85,6 +90,5 @@ func (db *DB) Close() error {
 	for _, u := range db.dbs {
 		c.Exec(u.Close)
 	}
-	c.Exec(db.relay.close)
 	return nil
 }

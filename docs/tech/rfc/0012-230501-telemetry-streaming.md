@@ -20,7 +20,23 @@ components to support real-time needs.
 
 # 1 - Vocabulary
 
+**Telemetry** - The time-ordered emissions (samples) of a sensor or actuator (channel).
+For a more detailed discussion of telemetry, see [here](../telemetry.md).
+**Channel** - A logical collection of samples across a time range, typically associated
+with a single sensor or actuator.
+**Sample** - A single value emitted by a sensor or actuator at a given time.
+**Regular** - Telemetry that is emitted at a fixed (or nearly fixed) rate.
+
 # 2 - Motivation
+
+Synnax is all about allowing engineers to make rapid, data-driven decisions in near
+real-time. The faster we can move data to where it needs to go, the faster we can
+produce meaningful insights. Telemetry streaming is all about providing a view
+of system state in real-time to those who need it.
+
+The existing read and write pipelines are not designed to support real-time data
+movement. The read pipeline uses a pull based approach, meaning that a consumer
+must repeatedly poll the database for new data. This is very inefficient.
 
 # 3 - Philosophy
 
@@ -39,11 +55,45 @@ we need to keep leveraging these fundamentals to our advantage.
 I've decided these are so important that they deserve a page of their own,
 [here](/docs/tech/telemetry.md).
 
-# 4 - Requirements
+# 4 - Requirementso
+
+## 4.0 - Real-Time Telemetry Movement
+
+Telemetry should be streamable throughout the cluster in a manner that does not require
+continual polling from any consumer.
+
+## 4.1 - Ordered, reliable delivery
+
+Data should be delivered in an ordered and reliable fashion. This includes validating
+overlapping samples, data types, and continuity.
+
+## 4.2 - Consistent Interfaces
+
+The interfaces for writing historical telemetry and streaming telemetry should remain
+identical.
 
 # 5 - Design
 
 ## 5.0 - Summary
+
+Implementing telemetry streaming requires the addition of a cluster wide relay that
+intercepts writes to the database and forwards them to consumers. This relay intercepts
+writes at the storage level, meaning that existing write infrastructure in the
+distribution, service, and interface layers remains identical aside from a few backwards
+compatible changes.
+
+The iterator-based read pipeline also remains the same, allowing callers to read commited,
+historical data. Modifications to the read pipeline come with the addition of a `Streamer`
+type that serves as the primary means of consuming the data pushed through a relay.
+ 
+Certain streaming features require the addition of two channel types:
+event and virtual. Event channels are built for irregular, low volume telemetry
+scenarios such as manual interfaces for communicating with actuators. Virtual channels
+are not backed by any data on disk, and serve the purpose of communicating cluster wide
+signals and calculated values. Because they are not persisted, virtual channels can
+be non-leased, meaning that any node in the cluster can emit values through these channels;
+this is particularly useful in change data capture (CDC) scenarios using Aspen's gossip
+based KV propagation.
 
 ## 5.1 - Event Channels
 

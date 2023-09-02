@@ -50,6 +50,8 @@ in the first two scenarios, Synnax resembles a test and measurement system
 that is designed to acquire telemetry from sensors and send commands to actuators in
 real-time.
 
+**Telemetry is the time-ordered emissions (samples) of a sensor or actuator (channel).**
+
 # 3 - Fundamental Properties
 
 ## 3.0 - Samples

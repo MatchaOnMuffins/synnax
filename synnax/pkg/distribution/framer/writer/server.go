@@ -44,7 +44,7 @@ func (sf *server) handle(ctx context.Context, server ServerStream) error {
 	sender := &freightfluence.TransformSender[ts.WriterResponse, Response]{Sender: freighter.SenderNopCloser[Response]{StreamSender: server}}
 	sender.Transform = newResponseTranslator(sf.HostResolver.HostKey())
 
-	w, err := sf.TS.NewStreamWriter(ctx, req.Config.toStorage())
+	w, err := sf.TS.OpenWriter(ctx, req.Config.toStorage())
 	if err != nil {
 		return err
 	}

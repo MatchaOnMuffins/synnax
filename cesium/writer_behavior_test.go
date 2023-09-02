@@ -48,7 +48,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 						telem.NewArrayV[int64](1, 2, 3, 4),
 					}),
 				)).To(BeTrue())
-				end, ok := w.Commit()
+				end, ok := w.Commit(ctx)
 				Expect(ok).To(BeTrue())
 				Expect(w.Close()).To(Succeed())
 				Expect(end).To(Equal(13*telem.SecondTS + 1))
@@ -158,7 +158,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					telem.NewArrayV[int64](1, 2, 3),
 				}),
 			)).To(BeTrue())
-			_, ok := w.Commit()
+			_, ok := w.Commit(ctx)
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
@@ -177,7 +177,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					telem.NewArrayV[int64](1, 2, 3, 4),
 				},
 			))).To(BeTrue())
-			_, ok := w.Commit()
+			_, ok := w.Commit(ctx)
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
@@ -197,7 +197,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					telem.NewArrayV[int64](1, 2, 3, 4),
 				},
 			))).To(BeTrue())
-			_, ok := w.Commit()
+			_, ok := w.Commit(ctx)
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
@@ -217,7 +217,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					telem.NewArrayV[int64](1, 2, 3, 4),
 				},
 			))).To(BeTrue())
-			_, ok := w.Commit()
+			_, ok := w.Commit(ctx)
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
@@ -253,7 +253,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 						telem.NewSecondsTSV(10, 11, 12, 13),
 					}),
 				)).To(BeTrue())
-				_, ok := w.Commit()
+				_, ok := w.Commit(ctx)
 				Expect(ok).To(BeTrue())
 				Expect(w.Close()).To(Succeed())
 
@@ -270,7 +270,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 						telem.NewArrayV[int64](1, 2, 3, 4, 5),
 					},
 				))).To(BeTrue())
-				_, ok = w.Commit()
+				_, ok = w.Commit(ctx)
 				Expect(ok).To(BeFalse())
 				err := w.Close()
 				Expect(err).To(MatchError(cesium.ErrDiscontinuous))
@@ -293,7 +293,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 						telem.NewArrayV[int64](1, 2, 3, 4, 5),
 					},
 				))).To(BeTrue())
-				_, ok := w.Commit()
+				_, ok := w.Commit(ctx)
 				Expect(ok).To(BeFalse())
 				Expect(w.Close()).To(MatchError(cesium.ErrDiscontinuous))
 			})
@@ -327,7 +327,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					telem.NewArrayV[float64](1, 2, 3, 4, 5),
 				},
 			))).To(BeTrue())
-			_, ok := w.Commit()
+			_, ok := w.Commit(ctx)
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))

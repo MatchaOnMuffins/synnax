@@ -11,31 +11,47 @@ package writer
 
 import (
 	"context"
+	"github.com/synnaxlabs/synnax/pkg/distribution/core"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 
-	"github.com/samber/lo"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
 	"github.com/synnaxlabs/x/confluence"
-	"github.com/synnaxlabs/x/confluence/plumber"
 )
 
 // newGateway opens a new StreamWriter that writes to the store on the gateway node.
 func (s *Service) newGateway(ctx context.Context, cfg Config) (StreamWriter, error) {
-	w, err := s.TS.OpenWriter(ctx, cfg.toStorage())
-	if err != nil {
-		return nil, err
+	wrapped, err := s.Storage.OpenWriter(ctx, cfg.toStorage())
+	w := newGatewayWriter(s.HostResolver.HostKey(), wrapped)
+	return w, err
+}
+
+type gatewayWriter struct {
+	confluence.LinearTransform[Request, Response]
+	nodeKey core.NodeKey
+	wrapped *framer.Writer
+	seqNum  int
+}
+
+func newGatewayWriter(nodeKey core.NodeKey, writer *framer.Writer) *gatewayWriter {
+	return &gatewayWriter{nodeKey: nodeKey, wrapped: writer}
+}
+
+func (w *gatewayWriter) transform(ctx context.Context, in Request) (res Response, ok bool, err error) {
+	ok = true
+	switch in.Command {
+	case Data:
+		res.Ack = w.wrapped.Write(ctx, in.Frame.ToStorage())
+		if res.Ack {
+			ok = false
+		}
+	case Error:
+		res.Error = w.wrapped.Error()
+		w.seqNum++
+	case Commit:
+		res.End, res.Error = w.wrapped.Commit(ctx)
+		w.seqNum++
 	}
-	pipe := plumber.New()
-	plumber.SetSegment[ts.WriterRequest, ts.WriterResponse](pipe, "storage", w)
-	reqT := &confluence.LinearTransform[Request, ts.WriterRequest]{}
-	reqT.Transform = newRequestTranslator()
-	resT := &confluence.LinearTransform[ts.WriterResponse, Response]{}
-	resT.Transform = newResponseTranslator(s.HostResolver.HostKey())
-	plumber.SetSegment[Request, ts.WriterRequest](pipe, "requests", reqT)
-	plumber.SetSegment[ts.WriterResponse, Response](pipe, "responses", resT)
-	plumber.MustConnect[ts.WriterRequest](pipe, "requests", "storage", 1)
-	plumber.MustConnect[ts.WriterResponse](pipe, "storage", "responses", 1)
-	seg := &plumber.Segment[Request, Response]{Pipeline: pipe}
-	lo.Must0(seg.RouteInletTo("requests"))
-	lo.Must0(seg.RouteOutletFrom("responses"))
-	return seg, nil
+	res.SeqNum = w.seqNum
+	res.Command = in.Command
+	res.NodeKey = w.nodeKey
+	return
 }

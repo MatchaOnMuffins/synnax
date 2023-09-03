@@ -14,14 +14,14 @@ import (
 	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	dcore "github.com/synnaxlabs/synnax/pkg/distribution/core"
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/core"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/telem"
 )
 
 //go:generate stringer -type=Command
 type Command uint8
 
-const AutoSpan = ts.AutoSpan
+const AutoSpan = framer.AutoSpan
 
 const (
 	Next Command = iota + 1

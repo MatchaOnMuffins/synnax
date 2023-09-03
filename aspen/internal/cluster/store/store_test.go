@@ -23,7 +23,7 @@ var _ = Describe("Store", func() {
 
 	BeforeEach(func() { s = store.New(ctx) })
 
-	Describe("New", func() {
+	Describe("Open", func() {
 
 		It("Should open a new Store with empty state", func() {
 			Expect(s.CopyState().Nodes).ToNot(BeNil())

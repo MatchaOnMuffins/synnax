@@ -79,7 +79,7 @@ func (b *Builder) New(ctx context.Context) distribution.Distribution {
 
 	d.Framer = lo.Must(framer.Open(framer.Config{
 		ChannelReader: d.Channel,
-		TS:            d.Storage.TS,
+		Storage:       d.Storage.TS,
 		HostResolver:  d.Cluster,
 		Transport:     trans,
 	}))

@@ -44,7 +44,7 @@ var _ = Describe("storage", func() {
 			})
 		})
 		Describe("Permissions", func() {
-			Describe("New Directory", func() {
+			Describe("Open Directory", func() {
 				It("Should set the correct permissions on the storage directory", func() {
 					cfg.Perm = storage.DefaultConfig.Perm
 					store, err := storage.Open(cfg)

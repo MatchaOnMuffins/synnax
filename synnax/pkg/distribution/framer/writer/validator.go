@@ -97,7 +97,7 @@ func (v *validator) Flow(ctx signal.Context, opts ...confluence.Option) {
 
 func (v *validator) validate(req Request) error {
 	if req.Command < Data || req.Command > Error {
-		return errors.Wrapf(validate.Error, "invalid writer command: %d", req.Command)
+		return errors.Wrapf(validate.Error, "invalid wrapped command: %d", req.Command)
 	}
 	if req.Command == Data {
 		missing, extra := v.keys.Difference(req.Frame.Keys)

@@ -31,9 +31,9 @@ const (
 
 // Request represents a streaming call to a Writer.
 type Request struct {
-	// Command is the command to execute on the writer.
+	// Command is the command to execute on the wrapped.
 	Command Command `json:"command" msgpack:"command"`
-	// Config sets the configuration to use when opening the writer. Only used internally
+	// Config sets the configuration to use when opening the wrapped. Only used internally
 	// when open command is sent.
 	Config Config `json:"config" msgpack:"config"`
 	// Frame is the telemetry frame. This field is only acknowledged during Data commands.
@@ -42,7 +42,7 @@ type Request struct {
 
 // Response represents a response to a streaming call to a Writer.
 type Response struct {
-	// Command is the command that was executed on the writer.
+	// Command is the command that was executed on the wrapped.
 	Command Command `json:"command" msgpack:"command"`
 	// Ack is the acknowledgement of the command.
 	Ack     bool            `json:"ack" msgpack:"ack"`

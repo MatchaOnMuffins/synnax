@@ -1,8 +1,6 @@
 package control
 
 import (
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
-	"github.com/synnaxlabs/x/mask"
 	"github.com/synnaxlabs/x/telem"
 	"go/types"
 	"sync"
@@ -14,24 +12,19 @@ const (
 	Absolute Authority = iota
 )
 
-type Channel struct {
-	Authority Authority
-	Key       ts.ChannelKey
-}
-
-type Service struct {
+type Service[T comparable] struct {
 	sync.RWMutex
-	gates map[*Gate]types.Nil
+	gates map[*Gate[T]]types.Nil
 }
 
-type Gate struct {
-	svc       *Service
+type Gate[T comparable] struct {
+	svc       *Service[T]
 	timeRange telem.TimeRange
-	channels  map[ts.ChannelKey]Authority
+	channels  map[T]Authority
 }
 
-func OpenGate(svc *Service, tr telem.TimeRange) *Gate {
-	g := &Gate{
+func OpenGate[T comparable](svc *Service[T], tr telem.TimeRange) *Gate[T] {
+	g := &Gate[T]{
 		svc:       svc,
 		timeRange: tr,
 	}
@@ -41,40 +34,43 @@ func OpenGate(svc *Service, tr telem.TimeRange) *Gate {
 	return g
 }
 
-func (g *Gate) Close() {
+func (g *Gate[T]) Close() {
 	g.svc.Lock()
 	delete(g.svc.gates, g)
 	g.svc.Unlock()
 }
 
-func (g *Gate) Set(channels map[ts.ChannelKey]Authority) {
+func (g *Gate[T]) Set(e []T, auth []Authority) {
 	g.svc.Lock()
-	for key, auth := range channels {
-		g.channels[key] = auth
+	for i, key := range e {
+		g.channels[key] = auth[i]
 	}
 	g.svc.Unlock()
 }
 
-func (g *Gate) Delete(key ts.ChannelKey) {
+func (g *Gate[T]) Delete(key T) {
 	g.svc.Lock()
 	delete(g.channels, key)
 	g.svc.Unlock()
 }
 
-func (g *Gate) Mask(channels []ts.ChannelKey, mask *mask.Mask) {
+func (g *Gate[T]) Check(entities []T) (failed []T) {
 	g.svc.RLock()
 	defer g.svc.RUnlock()
-	for i, key := range channels {
+	for _, key := range entities {
 		auth, ok := g.channels[key]
 		if !ok {
-			mask.Set(uint16(i), true)
+			failed = append(failed, key)
+			continue
 		}
 		for gate, _ := range g.svc.gates {
 			if gate.timeRange.OverlapsWith(g.timeRange) {
 				if gate.channels[key] > auth {
-					mask.Set(uint16(i), true)
+					failed = append(failed, key)
+					break
 				}
 			}
 		}
 	}
+	return
 }

@@ -12,7 +12,7 @@
 //
 //  1. A key-value store (implementing the kv.DB interface) for storing cluster wide
 //     metadata.
-//  2. A time-series engine (implementing the TS interface) for writing frames of
+//  2. A time-series engine (implementing the Storage interface) for writing frames of
 //     telemetry.
 //
 // It's important to note that the storage package does NOT manage any sort of
@@ -20,7 +20,7 @@
 package storage
 
 import (
-	"github.com/synnaxlabs/cesium"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"io"
 	"io/fs"
 	"os"
@@ -31,7 +31,6 @@ import (
 	"github.com/cockroachdb/pebble/vfs"
 	"github.com/samber/lo"
 	"github.com/synnaxlabs/alamos"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
 	"github.com/synnaxlabs/x/binary"
 	"github.com/synnaxlabs/x/config"
 	"github.com/synnaxlabs/x/errutil"
@@ -74,7 +73,7 @@ type Storage struct {
 	// KV is the key-value store for the node.
 	KV kv.DB
 	// TS is the time-series engine for the node.
-	TS *cesium.DB
+	TS *framer.DB
 	// lock is the lock held on the storage directory.
 	lock io.Closer
 }
@@ -206,7 +205,7 @@ func Open(cfg Config) (s *Storage, err error) {
 	}
 
 	// Open the time-series engine.
-	if s.TS, err = openTS(cfg, baseXFS); err != nil {
+	if s.TS, err = openFramer(cfg, baseXFS); err != nil {
 		err = errors.CombineErrors(err, s.KV.Close())
 		return s, errors.CombineErrors(err, s.lock.Close())
 	}
@@ -304,11 +303,11 @@ func openKV(cfg Config, fs vfs.FS) (kv.DB, error) {
 	return pebblekv.Wrap(db), err
 }
 
-func openTS(cfg Config, fs xfs.FS) (*ts.DB, error) {
+func openFramer(cfg Config, fs xfs.FS) (*framer.DB, error) {
 	if cfg.TSEngine != CesiumTS {
 		return nil, errors.Newf("[storage] - unsupported time-series engine: %s", cfg.TSEngine)
 	}
-	return ts.Open(ts.Config{
+	return framer.Open(framer.Config{
 		Instrumentation: cfg.Instrumentation.Child("ts"),
 		Dirname:         filepath.Join(cfg.Dirname, cesiumDirname),
 		FS:              fs,

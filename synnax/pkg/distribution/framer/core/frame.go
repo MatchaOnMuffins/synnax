@@ -12,7 +12,7 @@ package core
 import (
 	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	"github.com/synnaxlabs/synnax/pkg/distribution/core"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/telem"
 )
 
@@ -67,7 +67,7 @@ func (f Frame) Even() bool {
 	return true
 }
 
-func (f Frame) ToStorage() (fr ts.Frame) {
+func (f Frame) ToStorage() (fr framer.Frame) {
 	fr.Series = f.Series
 	fr.Keys = f.Keys.Storage()
 	return fr
@@ -101,7 +101,7 @@ func MergeFrames(frames []Frame) (f Frame) {
 	return f
 }
 
-func NewFrameFromStorage(frame ts.Frame) Frame {
+func NewFrameFromStorage(frame framer.Frame) Frame {
 	keys := make(channel.Keys, len(frame.Series))
 	for i := range frame.Series {
 		keys[i] = channel.Key(frame.Keys[i])

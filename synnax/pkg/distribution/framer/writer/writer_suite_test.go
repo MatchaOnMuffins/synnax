@@ -62,7 +62,7 @@ func provision(n int) (*mock.CoreBuilder, map[core.NodeKey]serviceContainer) {
 		}))
 		container.writer = MustSucceed(writer.OpenService(writer.ServiceConfig{
 			Instrumentation: ins,
-			TS:              c.Storage.TS,
+			Storage:         c.Storage.TS,
 			ChannelReader:   container.channel,
 			HostResolver:    c.Cluster,
 			Transport:       writerNet.New(c.Config.AdvertiseAddress /*buffer*/, 10),

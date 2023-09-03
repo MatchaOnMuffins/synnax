@@ -17,7 +17,7 @@ import (
 )
 
 func disablePermissionBits() {
-	// Mask the permission bits so all files are readable and writable
+	// Check the permission bits so all files are readable and writable
 	// by the user and readable by the group.
 	mask := unix.Umask(int(xfs.OS_NO))
 	mask |= int(xfs.OS_OTH_RWX)

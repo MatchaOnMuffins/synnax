@@ -12,7 +12,6 @@ package framer
 import (
 	"context"
 	"github.com/synnaxlabs/cesium"
-	"github.com/synnaxlabs/cesium/internal/core"
 	"github.com/synnaxlabs/x/confluence"
 	"github.com/synnaxlabs/x/signal"
 )
@@ -21,13 +20,13 @@ import (
 // to.
 type StreamerRequest struct {
 	// Channels sets the channels the Streamer subscribes to.
-	Channels []core.ChannelKey
+	Channels []ChannelKey
 }
 
 // StreamerConfig sets the configuration parameters used when opening the Streamer.
 type StreamerConfig struct {
 	// Channels sets the channels the Streamer subscribes to.
-	Channels []core.ChannelKey
+	Channels []ChannelKey
 }
 
 // StreamerResponse contains a frame representing the series of all subscribed channels.

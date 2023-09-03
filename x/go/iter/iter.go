@@ -18,14 +18,14 @@ import (
 // indefinitely. It's safe to ignore the error and ok values returned by next.
 func Endlessly[T any](values []T) Nexter[T] {
 	i := 0
-	return NexterFunc[T](func(_ context.Context) (T, bool, error) {
+	return NexterFunc[T](func(_ context.Context) (T, bool) {
 		val := values[i]
 		if i < (len(values) - 1) {
 			i++
 		} else {
 			i = 0
 		}
-		return val, true, nil
+		return val, true
 	})
 }
 
@@ -34,13 +34,13 @@ func Endlessly[T any](values []T) Nexter[T] {
 // unclosed.
 func All[T any](values []T) Nexter[T] {
 	i := 0
-	return NexterFunc[T](func(_ context.Context) (t T, ok bool, err error) {
+	return NexterFunc[T](func(_ context.Context) (t T, ok bool) {
 		if i < len(values) {
 			val := values[i]
 			i++
-			return val, true, nil
+			return val, true
 		}
-		return t, false, nil
+		return t, false
 	})
 }
 
@@ -50,15 +50,15 @@ type Nexter[V any] interface {
 	// Next returns the next value in the sequence. If there are no more values to return
 	// ok will be false. If an error occurs while iterating over the values, err will be
 	// non-nil.
-	Next(ctx context.Context) (value V, ok bool, err error)
+	Next(ctx context.Context) (value V, ok bool)
 }
 
-type NexterFunc[V any] func(context.Context) (V, bool, error)
+type NexterFunc[V any] func(context.Context) (V, bool)
 
 var _ NexterFunc[any] = NexterFunc[any](nil)
 
 // Next implements Nexter.
-func (f NexterFunc[V]) Next(ctx context.Context) (V, bool, error) { return f(ctx) }
+func (f NexterFunc[V]) Next(ctx context.Context) (V, bool) { return f(ctx) }
 
 type NexterCloser[V any] interface {
 	Nexter[V]
@@ -69,7 +69,7 @@ type NexterNopCloser[V any] struct{ Wrap Nexter[V] }
 
 var _ NexterCloser[any] = NexterNopCloser[any]{}
 
-func (n NexterNopCloser[V]) Next(ctx context.Context) (V, bool, error) { return n.Wrap.Next(ctx) }
+func (n NexterNopCloser[V]) Next(ctx context.Context) (V, bool) { return n.Wrap.Next(ctx) }
 
 func (n NexterNopCloser[V]) Close() error { return nil }
 
@@ -78,9 +78,9 @@ type NexterCloserTranslator[I, O any] struct {
 	Translate func(I) O
 }
 
-func (n NexterCloserTranslator[I, O]) Next(ctx context.Context) (O, bool, error) {
-	val, ok, err := n.Wrap.Next(ctx)
-	return n.Translate(val), ok, err
+func (n NexterCloserTranslator[I, O]) Next(ctx context.Context) (O, bool) {
+	val, ok := n.Wrap.Next(ctx)
+	return n.Translate(val), ok
 }
 
 type NexterTranslator[I, O any] struct {
@@ -88,12 +88,12 @@ type NexterTranslator[I, O any] struct {
 	Translate func(I) O
 }
 
-func (n NexterTranslator[I, O]) Next(ctx context.Context) (tv O, ok bool, err error) {
-	val, ok, err := n.Wrap.Next(ctx)
-	if !ok || err != nil {
-		return tv, ok, err
+func (n NexterTranslator[I, O]) Next(ctx context.Context) (tv O, ok bool) {
+	val, ok := n.Wrap.Next(ctx)
+	if !ok {
+		return tv, ok
 	}
-	return n.Translate(val), ok, err
+	return n.Translate(val), ok
 }
 
 func (n NexterCloserTranslator[I, O]) Close() error { return n.Wrap.Close() }

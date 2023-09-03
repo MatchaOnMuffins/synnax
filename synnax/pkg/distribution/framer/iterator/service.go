@@ -11,6 +11,7 @@ package iterator
 
 import (
 	"context"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 
 	"github.com/cockroachdb/errors"
 	"github.com/samber/lo"
@@ -18,7 +19,6 @@ import (
 	"github.com/synnaxlabs/aspen"
 	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	"github.com/synnaxlabs/synnax/pkg/distribution/proxy"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
 	"github.com/synnaxlabs/x/address"
 	"github.com/synnaxlabs/x/config"
 	"github.com/synnaxlabs/x/confluence"
@@ -37,7 +37,7 @@ type Config struct {
 
 type ServiceConfig struct {
 	alamos.Instrumentation
-	TS            *ts.DB
+	Storage       *framer.DB
 	ChannelReader channel.Readable
 	HostResolver  aspen.HostResolver
 	Transport     Transport
@@ -50,7 +50,7 @@ var (
 
 // Override implements Config.
 func (cfg ServiceConfig) Override(other ServiceConfig) ServiceConfig {
-	cfg.TS = override.Nil(cfg.TS, other.TS)
+	cfg.Storage = override.Nil(cfg.Storage, other.Storage)
 	cfg.ChannelReader = override.Nil(cfg.ChannelReader, other.ChannelReader)
 	cfg.Transport = override.Nil(cfg.Transport, other.Transport)
 	cfg.HostResolver = override.Nil(cfg.HostResolver, other.HostResolver)
@@ -61,7 +61,7 @@ func (cfg ServiceConfig) Override(other ServiceConfig) ServiceConfig {
 // Validate implements Config.
 func (cfg ServiceConfig) Validate() error {
 	v := validate.New("distribution.framer.Iterator")
-	validate.NotNil(v, "TS", cfg.TS)
+	validate.NotNil(v, "Storage", cfg.Storage)
 	validate.NotNil(v, "ChannelReader", cfg.ChannelReader)
 	validate.NotNil(v, "Transport", cfg.Transport)
 	validate.NotNil(v, "Resolver", cfg.HostResolver)

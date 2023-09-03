@@ -37,7 +37,7 @@ var _ = Describe("TypedWriter", func() {
 			BeforeAll(func() { s = _sF() })
 			AfterAll(func() { Expect(s.close.Close()).To(Succeed()) })
 			Specify("It should write and commit data", func() {
-				writer := MustSucceed(s.service.New(context.TODO(), writer.Config{
+				writer := MustSucceed(s.service.Open(context.TODO(), writer.Config{
 					Keys:  s.keys,
 					Start: 10 * telem.SecondTS,
 				}))
@@ -70,7 +70,7 @@ var _ = Describe("TypedWriter", func() {
 		BeforeAll(func() { s = gatewayOnlyScenario() })
 		AfterAll(func() { Expect(s.close.Close()).To(Succeed()) })
 		It("Should return an error if no keys are provided", func() {
-			_, err := s.service.New(context.TODO(), writer.Config{
+			_, err := s.service.Open(context.TODO(), writer.Config{
 				Keys:  []channel.Key{},
 				Start: 10 * telem.SecondTS,
 			})
@@ -78,7 +78,7 @@ var _ = Describe("TypedWriter", func() {
 			Expect(err.Error()).To(ContainSubstring("keys"))
 		})
 		It("Should return an error if the channel can't be found", func() {
-			_, err := s.service.New(ctx, writer.Config{
+			_, err := s.service.Open(ctx, writer.Config{
 				Keys: []channel.Key{
 					channel.NewKey(0, 22),
 					s.keys[0],
@@ -93,7 +93,7 @@ var _ = Describe("TypedWriter", func() {
 		It("Should return an error if two keys do not share the same rate", func() {
 			ch := channel.Channel{Rate: 2 * telem.Hz, DataType: telem.Int64T}
 			Expect(s.channel.NewWriter(nil).Create(ctx, &ch)).To(Succeed())
-			_, err := s.service.New(context.TODO(), writer.Config{
+			_, err := s.service.Open(context.TODO(), writer.Config{
 				Keys: []channel.Key{s.keys[0], ch.Key()},
 			})
 			Expect(err).To(HaveOccurredAs(validate.Error))
@@ -110,7 +110,7 @@ var _ = Describe("TypedWriter", func() {
 				{DataType: telem.Int64T, LocalIndex: indexes[1].LocalKey},
 			}
 			Expect(s.channel.NewWriter(nil).CreateMany(ctx, &channels)).To(Succeed())
-			_, err := s.service.New(context.TODO(), writer.Config{
+			_, err := s.service.Open(context.TODO(), writer.Config{
 				Keys: []channel.Key{
 					channels[0].Key(),
 					channels[1].Key(),
@@ -124,8 +124,8 @@ var _ = Describe("TypedWriter", func() {
 		var s scenario
 		BeforeAll(func() { s = peerOnlyScenario() })
 		AfterAll(func() { Expect(s.close.Close()).To(Succeed()) })
-		It("Should return an error if a key is provided that is not in the list of keys provided to the writer", func() {
-			writer := MustSucceed(s.service.New(context.TODO(), writer.Config{
+		It("Should return an error if a key is provided that is not in the list of keys provided to the wrapped", func() {
+			writer := MustSucceed(s.service.Open(context.TODO(), writer.Config{
 				Keys:  s.keys,
 				Start: 10 * telem.SecondTS,
 			}))

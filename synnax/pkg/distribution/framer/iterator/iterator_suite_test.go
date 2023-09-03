@@ -55,7 +55,7 @@ func provision(n int) (*mock.CoreBuilder, map[core.NodeKey]serviceContainer) {
 			TSChannel:    c.Storage.TS,
 		}))
 		cont.iter = MustSucceed(iterator.OpenService(iterator.ServiceConfig{
-			TS:            c.Storage.TS,
+			Storage:       c.Storage.TS,
 			ChannelReader: cont.channel,
 			HostResolver:  c.Cluster,
 			Transport:     iterNet.New(c.Config.AdvertiseAddress),

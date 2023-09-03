@@ -104,7 +104,7 @@ func Open(ctx context.Context, cfg Config) (d Distribution, err error) {
 	d.Framer, err = framer.Open(framer.Config{
 		Instrumentation: cfg.Instrumentation.Child("framer"),
 		ChannelReader:   d.Channel,
-		TS:              d.Storage.TS,
+		Storage:         d.Storage.TS,
 		Transport:       frameTransport,
 		HostResolver:    d.Cluster,
 	})

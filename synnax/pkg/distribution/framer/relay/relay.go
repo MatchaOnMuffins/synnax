@@ -12,7 +12,7 @@ package relay
 import (
 	"github.com/synnaxlabs/alamos"
 	"github.com/synnaxlabs/synnax/pkg/distribution/core"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/address"
 	"github.com/synnaxlabs/x/config"
 	"github.com/synnaxlabs/x/confluence"
@@ -26,7 +26,7 @@ type Config struct {
 	alamos.Instrumentation
 	Transport    Transport
 	HostResolver core.HostResolver
-	TS           *ts.DB
+	TS           *framer.DB
 }
 
 var (

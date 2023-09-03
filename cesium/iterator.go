@@ -28,7 +28,7 @@ type Iterator struct {
 	internal []*unary.Iterator
 }
 
-func (db *DB) NewIterator(cfg IteratorConfig) (*Iterator, error) {
+func (db *DB) OpenIterator(cfg IteratorConfig) (*Iterator, error) {
 	internal := make([]*unary.Iterator, len(cfg.Channels))
 	for i, key := range cfg.Channels {
 		uDB, err := db.getUnary(key)

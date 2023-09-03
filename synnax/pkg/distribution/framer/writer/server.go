@@ -13,7 +13,6 @@ import (
 	"context"
 	"github.com/synnaxlabs/freighter"
 	"github.com/synnaxlabs/freighter/freightfluence"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
 	"github.com/synnaxlabs/x/confluence"
 	"github.com/synnaxlabs/x/confluence/plumber"
 	"github.com/synnaxlabs/x/signal"
@@ -31,7 +30,7 @@ func (sf *server) handle(ctx context.Context, server ServerStream) error {
 	sCtx, cancel := signal.WithCancel(ctx)
 	defer cancel()
 
-	// The first request provides the parameters for opening the toStorage writer
+	// The first request provides the parameters for opening the toStorage wrapped
 	req, err := server.Receive()
 	if err != nil {
 		return err
@@ -39,22 +38,21 @@ func (sf *server) handle(ctx context.Context, server ServerStream) error {
 
 	// Senders and receivers must be set up to distribution requests and responses
 	// to their storage counterparts.
-	receiver := &freightfluence.TransformReceiver[ts.WriterRequest, Request]{Receiver: server}
-	receiver.Transform = newRequestTranslator()
-	sender := &freightfluence.TransformSender[ts.WriterResponse, Response]{Sender: freighter.SenderNopCloser[Response]{StreamSender: server}}
-	sender.Transform = newResponseTranslator(sf.HostResolver.HostKey())
+	receiver := &freightfluence.Receiver[Request]{Receiver: server}
+	sender := &freightfluence.Sender[Response]{Sender: freighter.SenderNopCloser[Response]{StreamSender: server}}
 
-	w, err := sf.TS.OpenWriter(ctx, req.Config.toStorage())
+	w, err := sf.Storage.OpenWriter(ctx, req.Config.toStorage())
 	if err != nil {
 		return err
 	}
+	gw := newGatewayWriter(sf.HostResolver.HostKey(), w)
 
 	pipe := plumber.New()
-	plumber.SetSegment[ts.WriterRequest, ts.WriterResponse](pipe, "toStorage", w)
-	plumber.SetSource[ts.WriterRequest](pipe, "receiver", receiver)
-	plumber.SetSink[ts.WriterResponse](pipe, "sender", sender)
-	plumber.MustConnect[ts.WriterRequest](pipe, "receiver", "toStorage", 1)
-	plumber.MustConnect[ts.WriterResponse](pipe, "toStorage", "sender", 1)
+	plumber.SetSegment[Request, Response](pipe, "toStorage", gw)
+	plumber.SetSource[Request](pipe, "receiver", receiver)
+	plumber.SetSink[Response](pipe, "sender", sender)
+	plumber.MustConnect[Request](pipe, "receiver", "toStorage", 1)
+	plumber.MustConnect[Response](pipe, "toStorage", "sender", 1)
 	pipe.Flow(sCtx, confluence.CloseInletsOnExit())
 
 	return sCtx.Wait()

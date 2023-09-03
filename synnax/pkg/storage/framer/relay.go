@@ -24,10 +24,10 @@ type relay struct {
 	shutdown io.Closer
 }
 
-func newRelay(o *relay) *relay {
-	sCtx, cancel := signal.Isolated(signal.WithInstrumentation())
+func newRelay(cfg Config) *relay {
+	sCtx, cancel := signal.Isolated(signal.WithInstrumentation(cfg.Instrumentation))
 	delta := confluence.NewDynamicDeltaMultiplier[cesium.Frame]()
-	frames := confluence.NewStream[cesium.Frame](1)
+	frames := confluence.NewStream[Frame](1)
 	delta.InFrom(frames)
 	delta.Flow(sCtx)
 	return &relay{

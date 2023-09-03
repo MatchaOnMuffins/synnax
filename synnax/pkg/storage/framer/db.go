@@ -6,34 +6,27 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-package ts
+package framer
 
 import (
 	"github.com/synnaxlabs/alamos"
 	"github.com/synnaxlabs/cesium"
-	"github.com/synnaxlabs/synnax/pkg/storage/framer"
+	"github.com/synnaxlabs/synnax/pkg/storage/control"
 	"github.com/synnaxlabs/x/config"
 	xfs "github.com/synnaxlabs/x/io/fs"
 	"github.com/synnaxlabs/x/override"
 	"github.com/synnaxlabs/x/validate"
 )
 
-type (
-	DB                   = cesium.DB
-	Frame                = cesium.Frame
-	Channel              = cesium.Channel
-	ChannelKey           = cesium.ChannelKey
-	WriterConfig         = cesium.WriterConfig
-	Writer               = cesium.Writer
-	IteratorConfig       = cesium.IteratorConfig
-	Iterator             = cesium.Iterator
-	StreamReader         = framer.Streamer
-	StreamReaderConfig   = framer.StreamerConfig
-	StreamReaderRequest  = framer.StreamerRequest
-	StreamReaderResponse = framer.StreamerResponse
-)
-
 const AutoSpan = cesium.AutoSpan
+
+type (
+	Channel        = cesium.Channel
+	ChannelKey     = cesium.ChannelKey
+	Frame          = cesium.Frame
+	Iterator       = cesium.Iterator
+	IteratorConfig = cesium.IteratorConfig
+)
 
 type Config struct {
 	alamos.Instrumentation
@@ -69,14 +62,30 @@ func (c Config) Override(other Config) Config {
 	return c
 }
 
+type DB struct {
+	internal *cesium.DB
+	control  *control.Service[ChannelKey]
+	relay    *relay
+}
+
+func (db *DB) OpenIterator(cfg IteratorConfig) (*Iterator, error) {
+	return db.internal.OpenIterator(cfg)
+}
+
+func (db *DB) Close() error {
+	return db.internal.Close()
+}
+
 func Open(configs ...Config) (*DB, error) {
 	cfg, err := config.New(DefaultConfig, configs...)
 	if err != nil {
 		return nil, err
 	}
-	return cesium.Open(
+	db := &DB{relay: newRelay(cfg)}
+	db.internal, err = cesium.Open(
 		cfg.Dirname,
 		cesium.WithFS(cfg.FS),
 		cesium.WithInstrumentation(cfg.Instrumentation),
 	)
+	return db, err
 }

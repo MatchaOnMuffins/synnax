@@ -48,7 +48,7 @@ type DB struct {
 func (db *DB) Write(ctx context.Context, start telem.TimeStamp, frame Frame) (err error) {
 	_, span := db.T.Debug(ctx, "Write")
 	defer span.End()
-	w, err := db.NewWriter(ctx, WriterConfig{Start: start, Channels: frame.Keys})
+	w, err := db.OpenWriter(ctx, WriterConfig{Start: start, Channels: frame.UniqueKeys()})
 	if err != nil {
 		return err
 	}
@@ -56,11 +56,11 @@ func (db *DB) Write(ctx context.Context, start telem.TimeStamp, frame Frame) (er
 		err = errors.CombineErrors(err, w.Close())
 	}()
 
-	if err := w.Write(frame); err != nil {
-		return err
+	if _, ok := w.Write(ctx, frame); !ok {
+		return
 	}
 	_, err = w.Commit(ctx)
-	return err
+	return
 }
 
 // WriteArray implements DB.
@@ -70,7 +70,7 @@ func (db *DB) WriteArray(ctx context.Context, key core.ChannelKey, start telem.T
 
 // Read implements DB.
 func (db *DB) Read(ctx context.Context, tr telem.TimeRange, keys ...core.ChannelKey) (frame Frame, err error) {
-	iter, err := db.NewIterator(IteratorConfig{Channels: keys, Bounds: tr})
+	iter, err := db.OpenIterator(IteratorConfig{Channels: keys, Bounds: tr})
 	if err != nil {
 		return
 	}

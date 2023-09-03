@@ -40,7 +40,7 @@ func (db *DB) index() index.Index {
 
 func (db *DB) SetIndex(idx index.Index) { db._idx = idx }
 
-func (db *DB) NewWriter(ctx context.Context, cfg domain.WriterConfig) (*Writer, error) {
+func (db *DB) OpenWriter(ctx context.Context, cfg domain.WriterConfig) (*Writer, error) {
 	w, err := db.Ranger.NewWriter(ctx, cfg)
 	return &Writer{start: cfg.Start, Channel: db.Channel, internal: w, idx: db.index()}, err
 }

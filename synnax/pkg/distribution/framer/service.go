@@ -17,7 +17,7 @@ import (
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/iterator"
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/relay"
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/writer"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/config"
 	"github.com/synnaxlabs/x/override"
 	"github.com/synnaxlabs/x/validate"
@@ -32,7 +32,7 @@ type Service struct {
 type Config struct {
 	alamos.Instrumentation
 	ChannelReader channel.Readable
-	TS            *ts.DB
+	Storage       *framer.DB
 	Transport     Transport
 	HostResolver  core.HostResolver
 }
@@ -45,7 +45,7 @@ var (
 func (c Config) Validate() error {
 	v := validate.New("distribution.framer")
 	validate.NotNil(v, "ChannelReader", c.ChannelReader)
-	validate.NotNil(v, "TS", c.TS)
+	validate.NotNil(v, "Storage", c.Storage)
 	validate.NotNil(v, "Transport", c.Transport)
 	validate.NotNil(v, "HostResolver", c.HostResolver)
 	return v.Error()
@@ -53,7 +53,7 @@ func (c Config) Validate() error {
 
 func (c Config) Override(other Config) Config {
 	c.ChannelReader = override.Nil(c.ChannelReader, other.ChannelReader)
-	c.TS = override.Nil(c.TS, other.TS)
+	c.Storage = override.Nil(c.Storage, other.Storage)
 	c.Transport = override.Nil(c.Transport, other.Transport)
 	c.HostResolver = override.Nil(c.HostResolver, other.HostResolver)
 	return c
@@ -66,7 +66,7 @@ func Open(configs ...Config) (*Service, error) {
 	}
 	s := &Service{}
 	s.iterator, err = iterator.OpenService(iterator.ServiceConfig{
-		TS:              cfg.TS,
+		Storage:         cfg.Storage,
 		HostResolver:    cfg.HostResolver,
 		Transport:       cfg.Transport.Iterator(),
 		ChannelReader:   cfg.ChannelReader,
@@ -76,7 +76,7 @@ func Open(configs ...Config) (*Service, error) {
 		return nil, err
 	}
 	s.writer, err = writer.OpenService(writer.ServiceConfig{
-		TS:              cfg.TS,
+		Storage:         cfg.Storage,
 		HostResolver:    cfg.HostResolver,
 		Transport:       cfg.Transport.Writer(),
 		ChannelReader:   cfg.ChannelReader,
@@ -84,7 +84,7 @@ func Open(configs ...Config) (*Service, error) {
 	})
 	s.relay, err = relay.Open(relay.Config{
 		Instrumentation: cfg.Instrumentation,
-		TS:              cfg.TS,
+		TS:              cfg.Storage,
 		HostResolver:    cfg.HostResolver,
 		Transport:       cfg.Transport.Relay(),
 	})
@@ -100,11 +100,11 @@ func (s *Service) NewStreamIterator(ctx context.Context, cfg IteratorConfig) (St
 }
 
 func (s *Service) NewWriter(ctx context.Context, cfg WriterConfig) (*Writer, error) {
-	return s.writer.New(ctx, cfg)
+	return s.writer.Open(ctx, cfg)
 }
 
 func (s *Service) NewStreamWriter(ctx context.Context, cfg WriterConfig) (StreamWriter, error) {
-	return s.writer.NewStream(ctx, cfg)
+	return s.writer.OpenStream(ctx, cfg)
 }
 
 // Close closes the Service.

@@ -22,15 +22,13 @@ type Frame struct {
 
 func NewFrame(keys []ChannelKey, series []telem.Series) Frame {
 	if len(keys) != len(series) {
-		panic("[cesium] - Keys and telemetry series in a frame must be of the same length")
+		panic("[cesium] - keys and telemetry series in a frame must be of the same length")
 	}
 	kf := Frame{Keys: keys, Series: series}
 	return kf
 }
 
 func (f Frame) UniqueKeys() []ChannelKey { return lo.Uniq(f.Keys) }
-
-func (f Frame) Key(i int) ChannelKey { return f.Keys[i] }
 
 func (f Frame) Append(key ChannelKey, series telem.Series) Frame {
 	return NewFrame(append(f.Keys, key), append(f.Series, series))

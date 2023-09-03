@@ -35,7 +35,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					cesium.Channel{Key: basic1Index, IsIndex: true, DataType: telem.TimeStampT},
 					cesium.Channel{Key: basic1, Index: basic1Index, DataType: telem.Int64T},
 				)).To(Succeed())
-				w := MustSucceed(db.NewWriter(ctx, cesium.WriterConfig{
+				w := MustSucceed(db.OpenWriter(ctx, cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{basic1, basic1Index},
 					Start:    10 * telem.SecondTS,
 				}))
@@ -55,9 +55,9 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 
 				By("Reading the data back")
 				frame := MustSucceed(db.Read(ctx, telem.TimeRangeMax, basic1))
-				Expect(frame.Series[0].TimeRange).To(Equal((10 * telem.SecondTS).Range(13*telem.SecondTS + 1)))
+				Expect(frame.series[0].TimeRange).To(Equal((10 * telem.SecondTS).Range(13*telem.SecondTS + 1)))
 				tsFrame := MustSucceed(db.Read(ctx, telem.TimeRangeMax, basic1Index))
-				Expect(tsFrame.Series[0].TimeRange).To(Equal((10 * telem.SecondTS).Range(13*telem.SecondTS + 1)))
+				Expect(tsFrame.series[0].TimeRange).To(Equal((10 * telem.SecondTS).Range(13*telem.SecondTS + 1)))
 			})
 		})
 	})
@@ -76,7 +76,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 				cesium.Channel{Key: diffIndex3, Index: diffIndex1, DataType: telem.Int64T},
 				cesium.Channel{Key: diffIndex4, Index: diffIndex2, DataType: telem.Int64T},
 			)).To(Succeed())
-			_, err := db.NewWriter(ctx, cesium.WriterConfig{
+			_, err := db.OpenWriter(ctx, cesium.WriterConfig{
 				Channels: []cesium.ChannelKey{diffIndex3, diffIndex4},
 				Start:    10 * telem.SecondTS,
 			})
@@ -93,7 +93,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 				cesium.Channel{Key: diffRate2, DataType: telem.Int64T, Rate: 1},
 				cesium.Channel{Key: diffRate3, DataType: telem.Int64T, Rate: 2},
 			)).To(Succeed())
-			_, err := db.NewWriter(
+			_, err := db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{diffRate2, diffRate3},
@@ -112,7 +112,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 				cesium.Channel{Key: indexRate1, IsIndex: true, DataType: telem.TimeStampT},
 				cesium.Channel{Key: indexRate2, DataType: telem.Int64T, Rate: 1},
 			)).To(Succeed())
-			_, err := db.NewWriter(
+			_, err := db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{indexRate1, indexRate2},
@@ -122,7 +122,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("channels must have the same index"))
 		})
 		Specify("Channel that does not exist", func() {
-			_, err := db.NewWriter(
+			_, err := db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{55000},
@@ -145,7 +145,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 		})
 		Specify("Uneven Frame", func() {
 			w := MustSucceed(
-				db.NewWriter(ctx,
+				db.OpenWriter(ctx,
 					cesium.WriterConfig{
 						Channels: []cesium.ChannelKey{frameErr1, frameErr2},
 						Start:    10 * telem.SecondTS,
@@ -165,7 +165,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("uneven frame"))
 		})
 		Specify("Frame Without All Channels", func() {
-			w := MustSucceed(db.NewWriter(
+			w := MustSucceed(db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{frameErr1, frameErr2},
@@ -184,7 +184,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("frame without data for all channels"))
 		})
 		Specify("Frame with Duplicate Channels", func() {
-			w := MustSucceed(db.NewWriter(
+			w := MustSucceed(db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{frameErr1, frameErr2},
@@ -204,7 +204,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("duplicate channel"))
 		})
 		Specify("Frame with Unknown Channel", func() {
-			w := MustSucceed(db.NewWriter(
+			w := MustSucceed(db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{frameErr1, frameErr2},
@@ -239,7 +239,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					cesium.Channel{Key: disc1Index, IsIndex: true, DataType: telem.TimeStampT},
 					cesium.Channel{Key: disc1, Index: disc1Index, DataType: telem.Int64T},
 				)).To(Succeed())
-				w := MustSucceed(db.NewWriter(
+				w := MustSucceed(db.OpenWriter(
 					ctx,
 					cesium.WriterConfig{
 						Channels: []cesium.ChannelKey{disc1Index},
@@ -258,7 +258,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 				Expect(w.Close()).To(Succeed())
 
 				By("Writing data to channel where the last sample is not the index")
-				w = MustSucceed(db.NewWriter(
+				w = MustSucceed(db.OpenWriter(
 					ctx,
 					cesium.WriterConfig{
 						Channels: []cesium.ChannelKey{disc1},
@@ -281,7 +281,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					cesium.Channel{Key: disc2Index, IsIndex: true, DataType: telem.TimeStampT},
 					cesium.Channel{Key: disc2, Index: disc2Index, DataType: telem.Int64T},
 				)).To(Succeed())
-				w := MustSucceed(db.NewWriter(
+				w := MustSucceed(db.OpenWriter(
 					ctx,
 					cesium.WriterConfig{
 						Channels: []cesium.ChannelKey{disc2},
@@ -300,7 +300,7 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 		})
 	})
 	Describe("Data Type Errors", func() {
-		Specify("Invalid Data Type for Series", func() {
+		Specify("Invalid Data Type for series", func() {
 			var dtErr cesium.ChannelKey = 18
 			Expect(db.CreateChannel(
 				ctx,
@@ -309,13 +309,13 @@ var _ = Describe("TypedWriter Behavior", Ordered, func() {
 					DataType: telem.Int64T,
 					Rate:     1,
 				})).To(Succeed())
-			w := MustSucceed(db.NewWriter(
+			w := MustSucceed(db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{dtErr},
 					Start:    10 * telem.SecondTS,
 				}))
-			w = MustSucceed(db.NewWriter(
+			w = MustSucceed(db.OpenWriter(
 				ctx,
 				cesium.WriterConfig{
 					Channels: []cesium.ChannelKey{dtErr},

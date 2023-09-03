@@ -19,12 +19,12 @@ package cesium_test
 //	// Create two channels: one to store the timestamps for our sensor data and one to
 //	// store the values themselves.
 //	timeChannel := cesium.Channel{
-//		Key:      1,
+//		Item:      1,
 //		DataType: telem.TimeStampT,
 //		IsIndex:  true,
 //	}
 //	sensorChannel := cesium.Channel{
-//		Key:      2,
+//		Item:      2,
 //		DataType: telem.Float64T,
 //		Index:    1,
 //	}
@@ -47,10 +47,10 @@ package cesium_test
 //	sensorData := telem.NewArrayV[float64](1, 2, 3, 4)
 //
 //	// Write our data.
-//	if err := db.WriteArray(ctx, timeChannel.Key, firstSampleTimeStamp, timestamps); err != nil {
+//	if err := db.WriteArray(ctx, timeChannel.Item, firstSampleTimeStamp, timestamps); err != nil {
 //		log.Fatal(err)
 //	}
-//	if err := db.WriteArray(ctx, sensorChannel.Key, firstSampleTimeStamp, sensorData); err != nil {
+//	if err := db.WriteArray(ctx, sensorChannel.Item, firstSampleTimeStamp, sensorData); err != nil {
 //		log.Fatal(err)
 //	}
 //
@@ -58,14 +58,14 @@ package cesium_test
 //	// starting bound and an exclusive ending bound.
 //	timeRange := firstSampleTimeStamp.SpanRange(4 * telem.Second)
 //
-//	frame, err := db.Read(ctx, timeRange, timeChannel.Key, sensorChannel.Key)
+//	frame, err := db.Read(ctx, timeRange, timeChannel.Item, sensorChannel.Item)
 //	if err != nil {
 //		log.Fatal(err)
 //	}
 //
-//	// Get the sensor and time series from the returned frame.
-//	fetchedSensorData := frame.Get(sensorChannel.Key)
-//	fetchedTimeData := frame.Get(timeChannel.Key)
+//	// Visible the sensor and time series from the returned frame.
+//	fetchedSensorData := frame.Visible(sensorChannel.Item)
+//	fetchedTimeData := frame.Visible(timeChannel.Item)
 //	log.Println(fetchedTimeData)
 //	log.Println(fetchedSensorData)
 //}

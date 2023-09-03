@@ -37,7 +37,7 @@ var _ = Describe("Open", func() {
 			pledgeNet = fmock.NewNetwork[pledge.Request, pledge.Response]()
 		})
 
-		Context("New cluster", func() {
+		Context("Open cluster", func() {
 
 			It("Should correctly join the cluster", func() {
 

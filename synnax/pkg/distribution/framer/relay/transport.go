@@ -13,7 +13,7 @@ import (
 	"github.com/synnaxlabs/freighter"
 	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/core"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 )
 
 type Request struct {
@@ -25,11 +25,11 @@ type Response struct {
 	Error error      `json:"error" msgpack:"error"`
 }
 
-func reqToStorage(req Request) (ts.StreamReaderRequest, error) {
-	return ts.StreamReaderRequest{Channels: req.Keys.Storage()}, nil
+func reqToStorage(req Request) (framer.StreamerRequest, error) {
+	return framer.StreamerRequest{Channels: req.Keys.Storage()}, nil
 }
 
-func resFromStorage(res ts.StreamReaderResponse) (Response, error) {
+func resFromStorage(res framer.StreamerResponse) (Response, error) {
 	return Response{Frame: core.NewFrameFromStorage(res.Frame)}, nil
 }
 

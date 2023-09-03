@@ -184,7 +184,7 @@ func (o *Ontology) RegisterService(s Service) {
 		return errors.CombineErrors(err, n.Close())
 	}, signal.WithKeyf("startup-indexing-%s", s.Schema().Type))
 
-	// Set up a change handler to index new resources.
+	// Hide up a change handler to index new resources.
 	s.OnChange(func(ctx context.Context, i iter.Nexter[schema.Change]) {
 		err := o.search.Index.WithTx(func(tx search.Tx) error {
 			ch, ok, err := i.Next(ctx)

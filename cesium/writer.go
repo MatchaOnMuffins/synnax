@@ -16,7 +16,6 @@ import (
 	"github.com/synnaxlabs/cesium/internal/domain"
 	"github.com/synnaxlabs/cesium/internal/index"
 	"github.com/synnaxlabs/cesium/internal/unary"
-	"github.com/synnaxlabs/x/confluence"
 	"github.com/synnaxlabs/x/errutil"
 	"github.com/synnaxlabs/x/telem"
 	"github.com/synnaxlabs/x/validate"
@@ -27,10 +26,10 @@ type WriterConfig struct {
 	Channels []core.ChannelKey
 }
 
-type Writer struct {
+type idxWriter struct {
 	WriterConfig
 	// internal contains writers for each channel
-	internal map[core.ChannelKey]unary.Writer
+	internal map[ChannelKey]unary.Writer
 	// writingToIdx is true when the Write is writing to the index
 	// channel. This is typically true, which allows us to avoid
 	// unnecessary lookups.
@@ -41,114 +40,183 @@ type Writer struct {
 		highWaterMark telem.TimeStamp
 	}
 	sampleCount int64
-	seqNum      int
 	err         error
-	relay       confluence.Inlet[Frame]
 }
 
-func (db *DB) NewWriter(ctx context.Context, cfg WriterConfig) (*Writer, error) {
+type Writer struct {
+	internal []idxWriter
+}
+
+func (w *Writer) Write(ctx context.Context, fr Frame) (Frame, bool) {
+	var ok bool
+	for _, idx_ := range w.internal {
+		idx := &idx_
+		if idx.err != nil {
+			return fr, false
+		}
+		fr, ok = idx.Write(ctx, fr)
+		if !ok {
+			return fr, false
+		}
+	}
+	return fr, true
+}
+
+func (w *Writer) Close() error {
+	c := errutil.NewCatch(errutil.WithAggregation())
+	for _, idx := range w.internal {
+		c.Exec(idx.Close)
+	}
+	return c.Error()
+}
+
+func (w *Writer) Commit(ctx context.Context) (telem.TimeStamp, error) {
+	maxTS := telem.TimeStampMin
+	for _, idx := range w.internal {
+		ts, err := idx.Commit(ctx)
+		if err != nil {
+			return 0, err
+		}
+		if ts > maxTS {
+			maxTS = ts
+		}
+	}
+	return maxTS, nil
+}
+
+func (db *DB) OpenWriter(ctx context.Context, cfg WriterConfig) (*Writer, error) {
 	var (
-		idx          index.Index
-		writingToIdx bool
-		idxChannel   Channel
-		internal     = make(map[core.ChannelKey]unary.Writer, len(cfg.Channels))
+		idxInternal  map[ChannelKey]idxWriter
+		rateInternal map[telem.Rate]idxWriter
 	)
-	for i, key := range cfg.Channels {
+	for _, key := range cfg.Channels {
 		u, ok := db.dbs[key]
 		if !ok {
 			return nil, ChannelNotFound
 		}
-		if u.Channel.IsIndex {
-			writingToIdx = true
+		w, err := u.OpenWriter(ctx, domain.WriterConfig{Start: cfg.Start})
+		if err != nil {
+			return nil, err
 		}
-		if i == 0 {
-			if u.Channel.Index != 0 {
+		if u.Channel.Index != 0 {
+			if idxInternal == nil {
+				idxInternal = make(map[ChannelKey]idxWriter)
+			}
+
+			idxW, ok := idxInternal[u.Channel.Index]
+			if !ok {
 				idxU, err := db.getUnary(u.Channel.Index)
 				if err != nil {
 					return nil, err
 				}
-				idx = &index.Domain{DB: idxU.Ranger, Instrumentation: db.Instrumentation}
-				idxChannel = idxU.Channel
-			} else {
-				idx = index.Rate{Rate: u.Channel.Rate}
-				idxChannel = u.Channel
+				idx := &index.Domain{DB: idxU.Ranger, Instrumentation: db.Instrumentation}
+				idxChannel := idxU.Channel
+				idxW = idxWriter{internal: make(map[ChannelKey]unary.Writer)}
+				idxW.idx.key = idxChannel.Key
+				idxW.idx.Index = idx
+				idxW.Start = cfg.Start
+				idxW.writingToIdx = u.Channel.IsIndex
+				idxW.idx.highWaterMark = cfg.Start
+				idxInternal[idxChannel.Key] = idxW
+			} else if u.Channel.IsIndex {
+				idxW.writingToIdx = true
 			}
+
+			idxW.internal[key] = *w
 		} else {
-			if err := validateSameIndex(u.Channel, idxChannel); err != nil {
-				return nil, err
+			if rateInternal == nil {
+				rateInternal = make(map[telem.Rate]idxWriter)
+			}
+			idxW, ok := rateInternal[u.Channel.Rate]
+			if !ok {
+				idx := index.Rate{Rate: u.Channel.Rate}
+				idxChannel := u.Channel
+				idxW = idxWriter{internal: make(map[ChannelKey]unary.Writer)}
+				idxW.idx.key = idxChannel.Key
+				idxW.idx.Index = idx
+				idxW.Start = cfg.Start
+				idxW.idx.highWaterMark = cfg.Start
+				rateInternal[idxChannel.Rate] = idxW
 			}
 		}
-		w, err := u.NewWriter(ctx, domain.WriterConfig{Start: cfg.Start})
-		if err != nil {
-			return nil, err
-		}
-		internal[key] = *w
 	}
 
-	w := &Writer{internal: internal, relay: db.relay.inlet}
-	w.Start = cfg.Start
-	w.idx.key = idxChannel.Key
-	w.writingToIdx = writingToIdx
-	w.idx.highWaterMark = cfg.Start
-	w.idx.Index = idx
+	w := &Writer{internal: make([]idxWriter, 0, len(idxInternal)+len(rateInternal))}
+	for _, idx := range idxInternal {
+		w.internal = append(w.internal, idx)
+	}
+	for _, idx := range rateInternal {
+		w.internal = append(w.internal, idx)
+	}
 	return w, nil
 }
 
-func validateSameIndex(chOne, chTwo Channel) error {
-	if chOne.Index == 0 && chTwo.Index == 0 {
-		if chOne.Rate != chTwo.Rate {
-			return errors.Wrapf(validate.Error, "channels must have the same rate")
+func (w *idxWriter) Write(ctx context.Context, fr Frame) (Frame, bool) {
+	if w.err != nil {
+		return fr, false
+	}
+
+	c := 0
+	l := fr.Series[0].Len()
+	for i, k := range fr.Keys {
+		_, ok := w.internal[k]
+		if ok {
+			c++
+		}
+		if fr.Series[i].Len() != l {
+			w.err = errors.Wrapf(
+				validate.Error,
+				"frame must have the same length for all series, expected %d, got %d",
+				l,
+				fr.Series[i].Len(),
+			)
+			return fr, false
 		}
 	}
-	if chOne.Index != chTwo.Index {
-		return errors.Wrapf(validate.Error, "channels must have the same index")
-	}
-	return nil
-}
 
-func (w *Writer) Write(fr Frame) error {
-	if !fr.Even() {
-		return errors.Wrapf(validate.Error, "cannot Write uneven frame")
+	if c != len(w.internal) {
+		w.err = errors.Wrapf(
+			validate.Error,
+			"frame must have exactly one series for all channels, expected %d, got %d",
+			c,
+			len(w.internal),
+		)
+		return fr, false
 	}
-
-	if !fr.Unary() {
-		return errors.Wrapf(validate.Error, "cannot Write frame with duplicate channels")
-	}
-
-	if len(fr.Keys) != len(w.internal) {
-		return errors.Wrapf(validate.Error, "cannot Write frame without data for all channels")
-	}
-
-	w.sampleCount += fr.Len()
 
 	for i, series := range fr.Series {
-		key := fr.Key(i)
-		_chW, ok := w.internal[fr.Keys[i]]
+		key := fr.Keys[i]
+		_chW, ok := w.internal[key]
 		if !ok {
-			return errors.Wrapf(
-				validate.Error,
-				"cannot Write array for channel %s that was not specified when opening the Writer",
-				key,
-			)
+			continue
 		}
 
 		chW := &_chW
 
 		if w.writingToIdx && w.idx.key == key {
 			if err := w.updateHighWater(series); err != nil {
-				return err
+				w.err = err
+				return fr, false
 			}
 		}
 
-		if err := chW.Write(series); err != nil {
-			return err
+		alignment, err := chW.Write(series)
+		if err != nil {
+			w.err = err
+			return fr, false
 		}
+		series.Alignment = alignment
+		fr.Series[i] = series
 	}
 
-	return nil
+	return fr, w.err == nil
 }
 
-func (w *Writer) Commit(ctx context.Context) (telem.TimeStamp, error) {
+func (w *idxWriter) Error() error {
+	return w.err
+}
+
+func (w *idxWriter) Commit(ctx context.Context) (telem.TimeStamp, error) {
 	end, err := w.resolveCommitEnd(ctx)
 	if err != nil {
 		return end.Lower, err
@@ -162,7 +230,7 @@ func (w *Writer) Commit(ctx context.Context) (telem.TimeStamp, error) {
 	return end.Lower, c.Error()
 }
 
-func (w *Writer) Close() error {
+func (w *idxWriter) Close() error {
 	c := errutil.NewCatch(errutil.WithAggregation())
 	for _, chW := range w.internal {
 		c.Exec(chW.Close)
@@ -170,7 +238,7 @@ func (w *Writer) Close() error {
 	return errors.CombineErrors(w.err, c.Error())
 }
 
-func (w *Writer) updateHighWater(col telem.Series) error {
+func (w *idxWriter) updateHighWater(col telem.Series) error {
 	if col.DataType != telem.TimeStampT && col.DataType != telem.Int64T {
 		return errors.Wrapf(
 			validate.Error,
@@ -183,7 +251,7 @@ func (w *Writer) updateHighWater(col telem.Series) error {
 	return nil
 }
 
-func (w *Writer) resolveCommitEnd(ctx context.Context) (index.TimeStampApproximation, error) {
+func (w *idxWriter) resolveCommitEnd(ctx context.Context) (index.TimeStampApproximation, error) {
 	if w.writingToIdx {
 		return index.Exactly(w.idx.highWaterMark), nil
 	}

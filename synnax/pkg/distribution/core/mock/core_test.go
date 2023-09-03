@@ -20,7 +20,7 @@ import (
 )
 
 var _ = Describe("Mock", func() {
-	DescribeTable("New", func(cfg ...distribution.Config) {
+	DescribeTable("Open", func(cfg ...distribution.Config) {
 		builder := mock.NewCoreBuilder(cfg...)
 		coreOne := builder.New()
 		coreTwo := builder.New()

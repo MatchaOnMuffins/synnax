@@ -11,13 +11,13 @@ package relay
 
 import (
 	"context"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/signal"
 
 	"github.com/samber/lo"
 	"github.com/synnaxlabs/freighter/freightfluence"
 	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	"github.com/synnaxlabs/synnax/pkg/distribution/core"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
 	"github.com/synnaxlabs/x/address"
 	changex "github.com/synnaxlabs/x/change"
 	"github.com/synnaxlabs/x/confluence"
@@ -27,7 +27,7 @@ import (
 // demand represents a demand for streaming data from a specific entity.
 // this entity should generate a unique address (preferrably through address.Rand)
 // and use it throughout its lifecycle. To update the requested keys, the entity
-// should send a demand with variant Set, and to remove the demand, it should
+// should send a demand with variant Hide, and to remove the demand, it should
 // send a demand with variant Delete.
 type demand = changex.Change[address.Address, Request]
 
@@ -123,7 +123,7 @@ func (c *receiveCoordinator) openReceiver(
 	keys channel.Keys,
 ) (receiver, error) {
 	if nodeKey == c.HostResolver.HostKey() {
-		sr, err := c.TS.NewStreamer(ctx, ts.StreamReaderConfig{
+		sr, err := c.TS.NewStreamer(ctx, framer.StreamerConfig{
 			Channels: keys.Storage(),
 		})
 		if err != nil {
@@ -160,11 +160,7 @@ func newPeerReceiver(stream ClientStream) receiver {
 }
 
 // newGatewayReceiver opens a new receiver over the given storage layer
-// reader.
-func newGatewayReceiver(reader ts.StreamReader) receiver {
-	return confluence.NewTranslator(
-		reader,
-		reqToStorage,
-		resFromStorage,
-	)
+// streamer.
+func newGatewayReceiver(reader framer.Streamer) receiver {
+	return confluence.NewTranslator(reader, reqToStorage, resFromStorage)
 }

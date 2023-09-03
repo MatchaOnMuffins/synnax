@@ -13,24 +13,27 @@
 // optimize the concurrency of writes by passing requests and receiving responses through
 // a channel (implementing the confluence.Segment interface).
 //
-// As Synnax is in its early stages, the writer package still has a number of issues, the
+// As Synnax is in its early stages, the wrapped package still has a number of issues, the
 // most relevant of which is a lack of proper distributed transaction support. This means
 // that commits that succeed on one node may fail on another. Caveat emptor.
 package writer
 
 import (
 	"context"
+	"github.com/cockroachdb/errors"
 	"github.com/samber/lo"
 	"github.com/synnaxlabs/alamos"
 	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	dcore "github.com/synnaxlabs/synnax/pkg/distribution/core"
 	"github.com/synnaxlabs/synnax/pkg/distribution/proxy"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/control"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/address"
 	"github.com/synnaxlabs/x/config"
 	"github.com/synnaxlabs/x/confluence"
 	"github.com/synnaxlabs/x/confluence/plumber"
 	"github.com/synnaxlabs/x/override"
+	"github.com/synnaxlabs/x/query"
 	"github.com/synnaxlabs/x/signal"
 	"github.com/synnaxlabs/x/telem"
 	"github.com/synnaxlabs/x/validate"
@@ -46,21 +49,22 @@ type Config struct {
 	Keys channel.Keys `json:"keys" msgpack:"keys"`
 	// Start marks the starting timestamp of the first sample in the first frame. If
 	// telemetry occupying the given timestamp already exists for the provided keys,
-	// the writer will fail to open.
+	// the wrapped will fail to open.
 	// [REQUIRED]
-	Start telem.TimeStamp `json:"start" msgpack:"start"`
+	Start     telem.TimeStamp     `json:"start" msgpack:"start"`
+	Authority []control.Authority `json:"authority" msgpack:"authority"`
 }
 
-func (c Config) toStorage() ts.WriterConfig {
-	return ts.WriterConfig{Channels: c.Keys.Storage(), Start: c.Start}
+func (c Config) toStorage() framer.WriterConfig {
+	return framer.WriterConfig{Channels: c.Keys.Storage(), Start: c.Start, Authority: c.Authority}
 }
 
 // ServiceConfig is the configuration for opening a Writer or StreamWriter.
 type ServiceConfig struct {
 	alamos.Instrumentation
-	// TS is the local time series store to write to.
+	// Storage is the local time series store to write to.
 	// [REQUIRED]
-	TS *ts.DB
+	Storage *framer.DB
 	// ChannelReader is used to resolve metadata and routing information for the provided
 	// keys.
 	// [REQUIRED]
@@ -84,8 +88,8 @@ var (
 
 // Validate implements config.Config.
 func (cfg ServiceConfig) Validate() error {
-	v := validate.New("distribution.framer.writer")
-	validate.NotNil(v, "TS", cfg.TS)
+	v := validate.New("distribution.framer.wrapped")
+	validate.NotNil(v, "Storage", cfg.Storage)
 	validate.NotNil(v, "ChannelReader", cfg.ChannelReader)
 	validate.NotNil(v, "HostResolver", cfg.HostResolver)
 	validate.NotNil(v, "Transport", cfg.Transport)
@@ -94,7 +98,7 @@ func (cfg ServiceConfig) Validate() error {
 
 // Override implements config.Config.
 func (cfg ServiceConfig) Override(other ServiceConfig) ServiceConfig {
-	cfg.TS = override.Nil(cfg.TS, other.TS)
+	cfg.Storage = override.Nil(cfg.Storage, other.Storage)
 	cfg.ChannelReader = override.Nil(cfg.ChannelReader, other.ChannelReader)
 	cfg.HostResolver = override.Nil(cfg.HostResolver, other.HostResolver)
 	cfg.Transport = override.Nil(cfg.Transport, other.Transport)
@@ -102,14 +106,14 @@ func (cfg ServiceConfig) Override(other ServiceConfig) ServiceConfig {
 	return cfg
 }
 
-// Service is the central service for the writer package, allowing the caller to open
+// Service is the central service for the wrapped package, allowing the caller to open
 // Writers and StreamWriters for writing data to the cluster.
 type Service struct {
 	ServiceConfig
 	server *server
 }
 
-// OpenService opens the writer service using the given configuration. Also binds a server
+// OpenService opens the wrapped service using the given configuration. Also binds a server
 // to the given transport for receiving writes from other nodes in the cluster.
 func OpenService(configs ...ServiceConfig) (*Service, error) {
 	cfg, err := config.New(DefaultConfig, configs...)
@@ -125,12 +129,12 @@ const (
 	validatorResponsesAddr = address.Address("validatorResponses")
 )
 
-// New opens a new writer using the given configuration. The provided context is used to
-// control the lifetime of goroutines spawned by the writer. If the given context is cancelled,
-// the writer will immediately abort all pending writes and return an error.
-func (s *Service) New(ctx context.Context, cfg Config) (*Writer, error) {
+// Open opens a new wrapped using the given configuration. The provided context is used to
+// control the lifetime of goroutines spawned by the wrapped. If the given context is cancelled,
+// the wrapped will immediately abort all pending writes and return an error.
+func (s *Service) Open(ctx context.Context, cfg Config) (*Writer, error) {
 	sCtx, cancel := signal.WithCancel(ctx, signal.WithInstrumentation(s.Instrumentation))
-	seg, err := s.NewStream(ctx, cfg)
+	seg, err := s.OpenStream(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -147,10 +151,10 @@ func (s *Service) New(ctx context.Context, cfg Config) (*Writer, error) {
 	}, nil
 }
 
-// NewStream opens a new StreamWriter using the given configuration. The provided context
+// OpenStream opens a new StreamWriter using the given configuration. The provided context
 // is only used for opening the stream and is not used for concurrent flow control. The
 // context for managing flow control must be provided to StreamWriter.Flow.
-func (s *Service) NewStream(ctx context.Context, cfg Config) (StreamWriter, error) {
+func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, error) {
 	if err := s.validateChannelKeys(ctx, cfg.Keys); err != nil {
 		return nil, err
 	}
@@ -228,35 +232,23 @@ func (s *Service) NewStream(ctx context.Context, cfg Config) (StreamWriter, erro
 }
 
 func (s *Service) validateChannelKeys(ctx context.Context, keys channel.Keys) error {
-	v := validate.New("distribution.framer.writer")
+	v := validate.New("distribution.framer.wrapped")
 	if validate.NotEmptySlice(v, "keys", keys) {
 		return v.Error()
 	}
-	var channels []channel.Channel
-	if err := s.ChannelReader.
+	entries := make([]channel.Channel, 0, len(keys))
+	err := s.ChannelReader.
 		NewRetrieve().
-		Entries(&channels).
 		WhereKeys(keys...).
-		Exec(ctx, nil); err != nil {
-		return err
+		Entries(&entries).
+		Exec(ctx, nil)
+	if len(entries) != len(keys) {
+		missing, _ := lo.Difference(keys, channel.KeysFromChannels(entries))
+		return errors.Wrapf(
+			query.NotFound,
+			"[writer] - could not find channels: %v",
+			missing,
+		)
 	}
-	var (
-		refIndex channel.Key
-		refRate  telem.Rate
-	)
-	for i, c := range channels {
-		if i == 0 {
-			refIndex = c.Index()
-			refRate = c.Rate
-			continue
-		}
-		if c.Rate != 0 {
-			if c.Rate != refRate {
-				return v.Newf("channel rate mismatch: expected %s, found %s", c.Rate, refRate)
-			}
-		} else if c.Index() != refIndex {
-			return v.Newf("keys must have the same index: expected %s, found %s", refIndex, c.Index())
-		}
-	}
-	return nil
+	return err
 }

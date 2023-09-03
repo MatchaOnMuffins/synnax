@@ -11,6 +11,7 @@ package api_test
 
 import (
 	"context"
+	roacherrors "github.com/cockroachdb/errors"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/synnaxlabs/synnax/pkg/api"
@@ -56,7 +57,8 @@ var _ = Describe("ChannelReader", Ordered, func() {
 			})
 			Expect(err).To(HaveOccurred())
 			Expect(err.Err).To(HaveOccurred())
-			flds, ok := err.Err.(errors.Fields)
+			var flds errors.Fields
+			ok := roacherrors.As(err.Err, &flds)
 			Expect(ok).To(BeTrue())
 			Expect(flds[0].Field).To(Equal(field))
 			Expect(flds[0].Message).To(Equal(message))

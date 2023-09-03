@@ -35,8 +35,8 @@ func newGatewayWriter(nodeKey core.NodeKey, writer *framer.Writer) *gatewayWrite
 	return &gatewayWriter{nodeKey: nodeKey, wrapped: writer}
 }
 
-func (g *gatewayWriter) Flow(ctx signal.Context, opts ...confluence.Option) {
-	g.LinearTransform.Flow(ctx, append(opts, confluence.DeferErr(g.wrapped.Close))...)
+func (w *gatewayWriter) Flow(ctx signal.Context, opts ...confluence.Option) {
+	w.LinearTransform.Flow(ctx, append(opts, confluence.DeferErr(w.wrapped.Close))...)
 }
 
 func (w *gatewayWriter) transform(ctx context.Context, in Request) (res Response, ok bool, err error) {
@@ -51,7 +51,7 @@ func (w *gatewayWriter) transform(ctx context.Context, in Request) (res Response
 		res.Error = w.wrapped.Error()
 		w.seqNum++
 	case Commit:
-		res.End, res.Error = w.wrapped.Commit(ctx)
+		res.End, res.Ack = w.wrapped.Commit(ctx)
 		w.seqNum++
 	}
 	res.SeqNum = w.seqNum

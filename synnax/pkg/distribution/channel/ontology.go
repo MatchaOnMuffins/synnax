@@ -77,7 +77,7 @@ func translateChange(ch change) schema.Change {
 
 // OnChange implements ontology.Service.
 func (s *service) OnChange(f func(context.Context, iter.Nexter[schema.Change])) {
-	handleChange := func(ctx context.Context, reader gorp.TxReader[Key, Channel]) {
+	handleChange := func(ctx context.Context, reader *gorp.TxReader[Key, Channel]) {
 		f(ctx, iter.NexterTranslator[change, schema.Change]{
 			Wrap:      reader,
 			Translate: translateChange,

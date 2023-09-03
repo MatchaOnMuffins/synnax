@@ -52,7 +52,8 @@ func (sf *server) handle(ctx context.Context, server ServerStream) error {
 	}
 
 	pipe := plumber.New()
-	plumber.SetSegment[Request, Response](pipe, "storage", newGatewayIterator(iter))
+	gw := newGatewayIterator(iter, sf.HostResolver.HostKey())
+	plumber.SetSegment[Request, Response](pipe, "storage", gw)
 	plumber.SetSource[Request](pipe, "receiver", receiver)
 	plumber.SetSink[Response](pipe, "sender", sender)
 	plumber.MustConnect[Request](pipe, "receiver", "storage", 1)

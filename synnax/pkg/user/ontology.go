@@ -61,7 +61,7 @@ func (s *Service) OnChange(f func(context.Context, iter.Nexter[schema.Change])) 
 				Value:   newResource(ch.Value),
 			}
 		}
-		onChange = func(ctx context.Context, reader gorp.TxReader[uuid.UUID, User]) {
+		onChange = func(ctx context.Context, reader *gorp.TxReader[uuid.UUID, User]) {
 			f(ctx, iter.NexterTranslator[change, schema.Change]{
 				Wrap:      reader,
 				Translate: translate,

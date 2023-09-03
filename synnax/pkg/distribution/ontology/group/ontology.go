@@ -67,7 +67,7 @@ func translateChange(c change) schema.Change {
 }
 
 func (s *Service) OnChange(f func(ctx context.Context, nexter iter.Nexter[schema.Change])) {
-	handleChange := func(ctx context.Context, reader gorp.TxReader[uuid.UUID, Group]) {
+	handleChange := func(ctx context.Context, reader *gorp.TxReader[uuid.UUID, Group]) {
 		f(ctx, iter.NexterTranslator[change, schema.Change]{Wrap: reader, Translate: translateChange})
 	}
 	gorp.Observe[uuid.UUID, Group](s.DB).OnChange(handleChange)

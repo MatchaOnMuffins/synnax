@@ -30,7 +30,7 @@ func (db *DB) OpenWriter(ctx context.Context, cfg WriterConfig) (*Writer, error)
 	if err != nil {
 		return nil, err
 	}
-	g := control.OpenGate[ChannelKey](db.control, cfg.Start.Range(telem.TimeStampMax))
+	g := db.control.OpenGate(cfg.Start.Range(telem.TimeStampMax))
 	g.Set(cfg.Channels, cfg.Authority)
 	return &Writer{internal: internal, gate: g}, nil
 }

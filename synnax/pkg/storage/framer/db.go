@@ -14,6 +14,7 @@ import (
 	"github.com/synnaxlabs/cesium"
 	"github.com/synnaxlabs/synnax/pkg/storage/control"
 	"github.com/synnaxlabs/x/config"
+	"github.com/synnaxlabs/x/errutil"
 	xfs "github.com/synnaxlabs/x/io/fs"
 	"github.com/synnaxlabs/x/override"
 	"github.com/synnaxlabs/x/validate"
@@ -43,9 +44,7 @@ type Config struct {
 var (
 	_ config.Config[Config] = Config{}
 	// DefaultConfig is the default configuration for a DB.
-	DefaultConfig = Config{
-		FS: xfs.Default,
-	}
+	DefaultConfig = Config{FS: xfs.Default}
 )
 
 // Validate implements config.Config.
@@ -78,7 +77,10 @@ func (db *DB) OpenIterator(cfg IteratorConfig) (*Iterator, error) {
 }
 
 func (db *DB) Close() error {
-	return db.internal.Close()
+	c := errutil.NewCatch(errutil.WithAggregation())
+	c.Exec(db.internal.Close)
+	c.Exec(db.relay.close)
+	return c.Error()
 }
 
 func Open(configs ...Config) (*DB, error) {

@@ -12,8 +12,10 @@ package iterator
 import (
 	"context"
 	"github.com/synnaxlabs/synnax/pkg/distribution/core"
+	coref "github.com/synnaxlabs/synnax/pkg/distribution/framer/core"
 	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/confluence"
+	"github.com/synnaxlabs/x/signal"
 )
 
 func (s *Service) newGateway(cfg Config) (confluence.Segment[Request, Response], error) {
@@ -21,50 +23,60 @@ func (s *Service) newGateway(cfg Config) (confluence.Segment[Request, Response],
 		Bounds:   cfg.Bounds,
 		Channels: cfg.Keys.Storage(),
 	})
-	gw := newGatewayIterator(iter)
+	gw := &gatewayIterator{
+		wrap: iter,
+		host: s.HostResolver.HostKey(),
+	}
 	return gw, err
 }
 
 type gatewayIterator struct {
-	confluence.LinearTransform[Request, Response]
-	wrap    *framer.Iterator
-	hostKey core.NodeKey
-	seqNum  int
+	confluence.AbstractLinear[Request, Response]
+	wrap   *framer.Iterator
+	host   core.NodeKey
+	seqNum int
 }
 
-func newGatewayIterator(wrap *framer.Iterator) *gatewayIterator {
-	gw := &gatewayIterator{wrap: wrap}
-	gw.Transform = gw.transform
-	return gw
+func newGatewayIterator(wrap *framer.Iterator, host core.NodeKey) *gatewayIterator {
+	return &gatewayIterator{wrap: wrap, host: host}
 }
 
-func (i *gatewayIterator) transform(ctx context.Context, in Request) (res Response, ok bool, err error) {
-	ok = true
+func (i *gatewayIterator) Flow(ctx signal.Context, opts ...confluence.Option) {
+	o := confluence.NewOptions(append(opts, confluence.DeferErr(i.wrap.Close)))
+	o.AttachClosables(i.Out)
+	signal.GoRange(ctx, i.In.Outlet(), i.exec, o.Signal...)
+}
+
+func (i *gatewayIterator) exec(ctx context.Context, in Request) error {
 	i.seqNum++
+	ackRes := Response{Variant: AckResponse, Command: in.Command, NodeKey: i.host, SeqNum: i.seqNum}
+	dataRes := Response{Variant: DataResponse, NodeKey: i.host, Command: in.Command, SeqNum: i.seqNum}
 	switch in.Command {
 	case Next:
-		res.Ack = i.wrap.Next(ctx, in.Span)
+		ackRes.Ack = i.wrap.Next(ctx, in.Span)
+		dataRes.Frame = coref.NewFrameFromStorage(i.wrap.Value())
+		i.Out.Inlet() <- dataRes
 	case Prev:
-		res.Ack = i.wrap.Prev(ctx, in.Span)
+		ackRes.Ack = i.wrap.Prev(ctx, in.Span)
+		dataRes.Frame = coref.NewFrameFromStorage(i.wrap.Value())
+		i.Out.Inlet() <- dataRes
 	case SeekFirst:
-		res.Ack = i.wrap.SeekFirst(ctx)
+		ackRes.Ack = i.wrap.SeekFirst(ctx)
 	case SeekLast:
-		res.Ack = i.wrap.SeekLast(ctx)
+		ackRes.Ack = i.wrap.SeekLast(ctx)
 	case SeekLE:
-		res.Ack = i.wrap.SeekLE(ctx, in.Stamp)
+		ackRes.Ack = i.wrap.SeekLE(ctx, in.Stamp)
 	case SeekGE:
-		res.Ack = i.wrap.SeekGE(ctx, in.Stamp)
+		ackRes.Ack = i.wrap.SeekGE(ctx, in.Stamp)
 	case Valid:
-		res.Ack = i.wrap.Valid()
+		ackRes.Ack = i.wrap.Valid()
 	case SetBounds:
 		i.wrap.SetBounds(in.Bounds)
-		res.Ack = true
+		ackRes.Ack = true
 	case Error:
-		res.Error = i.wrap.Error()
-		res.Ack = true
+		ackRes.Error = i.wrap.Error()
+		ackRes.Ack = true
 	}
-	res.Command = in.Command
-	res.NodeKey = i.hostKey
-	res.SeqNum = i.seqNum
-	return
+	i.Out.Inlet() <- ackRes
+	return nil
 }

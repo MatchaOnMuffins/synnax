@@ -146,8 +146,8 @@ func (k *Iterator[E]) Valid() bool {
 //	r := gor.WrapTxReader[MyKey, MyEntry](tx.NewReader(), tx)
 //
 //	r, ok, err := r.Nexter(ctx)
-func WrapTxReader[K Key, E Entry[K]](reader kv.TxReader, tools Tools) TxReader[K, E] {
-	return TxReader[K, E]{
+func WrapTxReader[K Key, E Entry[K]](reader kv.TxReader, tools Tools) *TxReader[K, E] {
+	return &TxReader[K, E]{
 		TxReader:      reader,
 		Tools:         tools,
 		prefixMatcher: prefixMatcher[K, E](tools),
@@ -161,38 +161,41 @@ type TxReader[K Key, E Entry[K]] struct {
 	kv.TxReader
 	Tools
 	prefixMatcher func(ctx context.Context, key []byte) bool
+	err           error
 }
 
 // Next implements TxReader.
-func (t TxReader[K, E]) Next(ctx context.Context) (op change.Change[K, E], ok bool, err error) {
-	var kvOp kv.Change
-	kvOp, ok, err = t.TxReader.Next(ctx)
-	if !ok || err != nil {
-		return op, false, err
+func (t *TxReader[K, E]) Next(ctx context.Context) (op change.Change[K, E], ok bool) {
+	kvOp, ok := t.TxReader.Next(ctx)
+	if !ok {
+		return op, false
 	}
 	if !t.prefixMatcher(ctx, kvOp.Key) {
 		return t.Next(ctx)
 	}
-	op.Variant = kvOp.Variant
+	op.Variant = change.Set
 	if op.Variant != change.Set {
-		return
+		return op, true
 	}
-	if err = t.Decode(ctx, kvOp.Value, &op.Value); err != nil {
-		return
+	if err := t.Decode(ctx, kvOp.Value, &op.Value); err != nil {
+		t.err = err
+		return op, false
 	}
 	op.Key = op.Value.GorpKey()
-	return
+	return op, true
 }
+
+func (t *TxReader[K, E]) Close() error { return t.err }
 
 type next[E any] struct{ *Iterator[E] }
 
 var _ iter.NexterCloser[any] = (*next[any])(nil)
 
 // Next implements iter.Nexter.
-func (n *next[E]) Next(ctx context.Context) (e E, ok bool, err error) {
+func (n *next[E]) Next(ctx context.Context) (e E, ok bool) {
 	ok = n.Iterator.Next()
 	if !ok {
-		return e, ok, n.Iterator.Error()
+		return e, ok
 	}
-	return *n.Iterator.Value(ctx), ok, n.Iterator.Error()
+	return *n.Iterator.Value(ctx), ok
 }

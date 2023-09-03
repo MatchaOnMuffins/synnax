@@ -19,7 +19,7 @@ import (
 	. "github.com/synnaxlabs/x/testutil"
 )
 
-var _ = Describe("Tx", Ordered, func() {
+var _ = Describe("Reader", Ordered, func() {
 	var (
 		db   kvx.DB
 		ecdc binary.EncoderDecoder

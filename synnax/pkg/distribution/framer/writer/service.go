@@ -55,6 +55,29 @@ type Config struct {
 	Authority []control.Authority `json:"authority" msgpack:"authority"`
 }
 
+type keyAuthority struct {
+	channel.Key
+	auth control.Authority
+}
+
+func (c Config) authorities() []keyAuthority {
+	authorities := make([]keyAuthority, len(c.Keys))
+	for i, key := range c.Keys {
+		authorities[i] = keyAuthority{Key: key, auth: c.Authority[i]}
+	}
+	return authorities
+}
+
+func newConfigFromAuthorities(start telem.TimeStamp, authorities []keyAuthority) Config {
+	keys := make(channel.Keys, len(authorities))
+	auth := make([]control.Authority, len(authorities))
+	for i, authority := range authorities {
+		keys[i] = authority.Key
+		auth[i] = authority.auth
+	}
+	return Config{Keys: keys, Start: start, Authority: auth}
+}
+
 func (c Config) toStorage() framer.WriterConfig {
 	return framer.WriterConfig{Channels: c.Keys.Storage(), Start: c.Start, Authority: c.Authority}
 }
@@ -151,6 +174,8 @@ func (s *Service) Open(ctx context.Context, cfg Config) (*Writer, error) {
 	}, nil
 }
 
+var _ proxy.Entry = keyAuthority{}
+
 // OpenStream opens a new StreamWriter using the given configuration. The provided context
 // is only used for opening the stream and is not used for concurrent flow control. The
 // context for managing flow control must be provided to StreamWriter.Flow.
@@ -161,7 +186,7 @@ func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, err
 
 	var (
 		hostKey            = s.HostResolver.HostKey()
-		batch              = proxy.BatchFactory[channel.Key]{Host: hostKey}.Batch(cfg.Keys)
+		batch              = proxy.BatchFactory[keyAuthority]{Host: hostKey}.Batch(cfg.authorities())
 		pipe               = plumber.New()
 		needPeerRouting    = len(batch.Peers) > 0
 		needGatewayRouting = len(batch.Gateway) > 0
@@ -180,7 +205,7 @@ func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, err
 
 	if needPeerRouting {
 		routeBulkheadTo = peerSenderAddr
-		sender, receivers, _receiverAddresses, err := s.openManyPeers(ctx, batch.Peers)
+		sender, receivers, _receiverAddresses, err := s.openManyPeers(ctx, cfg.Start, batch.Peers)
 		if err != nil {
 			return nil, err
 		}
@@ -193,7 +218,7 @@ func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, err
 
 	if needGatewayRouting {
 		routeBulkheadTo = gatewayWriterAddr
-		w, err := s.newGateway(ctx, Config{Start: cfg.Start, Keys: batch.Gateway})
+		w, err := s.newGateway(ctx, newConfigFromAuthorities(cfg.Start, batch.Gateway))
 		if err != nil {
 			return nil, err
 		}

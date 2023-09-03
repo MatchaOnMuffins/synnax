@@ -15,7 +15,7 @@ import (
 	"github.com/synnaxlabs/synnax/pkg/distribution/core"
 	"github.com/synnaxlabs/synnax/pkg/distribution/ontology"
 	"github.com/synnaxlabs/synnax/pkg/distribution/ontology/group"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/config"
 	"github.com/synnaxlabs/x/gorp"
 	"github.com/synnaxlabs/x/override"
@@ -48,7 +48,7 @@ type Readable interface {
 type ServiceConfig struct {
 	HostResolver core.HostResolver
 	ClusterDB    *gorp.DB
-	TSChannel    *ts.DB
+	Storage      *framer.DB
 	Transport    Transport
 	Ontology     *ontology.Ontology
 	Group        *group.Service
@@ -60,7 +60,7 @@ func (c ServiceConfig) Validate() error {
 	v := validate.New("distribution.channel")
 	validate.NotNil(v, "HostResolver", c.HostResolver)
 	validate.NotNil(v, "ClusterDB", c.ClusterDB)
-	validate.NotNil(v, "TSChannel", c.TSChannel)
+	validate.NotNil(v, "Storage", c.Storage)
 	validate.NotNil(v, "Transport", c.Transport)
 	return v.Error()
 }
@@ -68,7 +68,7 @@ func (c ServiceConfig) Validate() error {
 func (c ServiceConfig) Override(other ServiceConfig) ServiceConfig {
 	c.HostResolver = override.Nil(c.HostResolver, other.HostResolver)
 	c.ClusterDB = override.Nil(c.ClusterDB, other.ClusterDB)
-	c.TSChannel = override.Nil(c.TSChannel, other.TSChannel)
+	c.Storage = override.Nil(c.Storage, other.Storage)
 	c.Transport = override.Nil(c.Transport, other.Transport)
 	c.Ontology = override.Nil(c.Ontology, other.Ontology)
 	c.Group = override.Nil(c.Group, other.Group)

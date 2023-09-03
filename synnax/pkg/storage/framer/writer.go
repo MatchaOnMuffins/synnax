@@ -32,10 +32,7 @@ func (db *DB) OpenWriter(ctx context.Context, cfg WriterConfig) (*Writer, error)
 	}
 	g := control.OpenGate[ChannelKey](db.control, cfg.Start.Range(telem.TimeStampMax))
 	g.Set(cfg.Channels, cfg.Authority)
-	return &Writer{
-		internal: internal,
-		gate:     g,
-	}, nil
+	return &Writer{internal: internal, gate: g}, nil
 }
 
 func (w *Writer) Write(ctx context.Context, alignedFr Frame) bool {
@@ -50,6 +47,10 @@ func (w *Writer) Write(ctx context.Context, alignedFr Frame) bool {
 	}
 	w.relay.inlet.Inlet() <- alignedFr
 	return true
+}
+
+func (w *Writer) Close() error {
+	return errors.CombineErrors(w.err, w.internal.Close())
 }
 
 func (w *Writer) Error() error {

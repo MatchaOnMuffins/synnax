@@ -59,7 +59,7 @@ func (db *DB) Write(ctx context.Context, start telem.TimeStamp, frame Frame) (er
 	if _, ok := w.Write(ctx, frame); !ok {
 		return
 	}
-	_, err = w.Commit(ctx)
+	w.Commit(ctx)
 	return
 }
 

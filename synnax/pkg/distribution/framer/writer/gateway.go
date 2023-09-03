@@ -13,8 +13,8 @@ import (
 	"context"
 	"github.com/synnaxlabs/synnax/pkg/distribution/core"
 	"github.com/synnaxlabs/synnax/pkg/storage/framer"
-
 	"github.com/synnaxlabs/x/confluence"
+	"github.com/synnaxlabs/x/signal"
 )
 
 // newGateway opens a new StreamWriter that writes to the store on the gateway node.
@@ -33,6 +33,10 @@ type gatewayWriter struct {
 
 func newGatewayWriter(nodeKey core.NodeKey, writer *framer.Writer) *gatewayWriter {
 	return &gatewayWriter{nodeKey: nodeKey, wrapped: writer}
+}
+
+func (g *gatewayWriter) Flow(ctx signal.Context, opts ...confluence.Option) {
+	g.LinearTransform.Flow(ctx, append(opts, confluence.DeferErr(g.wrapped.Close))...)
 }
 
 func (w *gatewayWriter) transform(ctx context.Context, in Request) (res Response, ok bool, err error) {

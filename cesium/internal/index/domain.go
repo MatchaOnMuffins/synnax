@@ -110,6 +110,8 @@ func (i *Domain) Stamp(
 
 	iter := i.DB.NewIterator(domain.IterRange(ref.SpanRange(telem.TimeSpanMax)))
 
+	// This checks if the iterator is empty or if the domain is too small to
+	// contain the offset and we require continuity.
 	if !iter.SeekFirst(ctx) ||
 		!iter.Range().ContainsStamp(ref) ||
 		(offset >= iter.Len()/8 && continuous) {
@@ -117,6 +119,7 @@ func (i *Domain) Stamp(
 		return
 	}
 
+	// Fast path optimization.
 	if offset == 0 {
 		approx = Exactly(ref)
 		return

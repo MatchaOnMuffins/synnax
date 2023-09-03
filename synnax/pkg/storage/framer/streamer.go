@@ -58,9 +58,7 @@ type Streamer = confluence.Segment[StreamerRequest, StreamerResponse]
 // opening the reader, and cancelling it has no implications after NewStreamer
 // returns.
 func (db *DB) NewStreamer(ctx context.Context, cfg StreamerConfig) (Streamer, error) {
-	return &streamer{
-		StreamerConfig: cfg,
-	}, nil
+	return &streamer{StreamerConfig: cfg}, nil
 }
 
 type streamer struct {

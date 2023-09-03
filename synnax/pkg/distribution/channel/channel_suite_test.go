@@ -48,13 +48,13 @@ func provisionServices() (*mock.CoreBuilder, map[core.NodeKey]channel.Service) {
 	services[1] = MustSucceed(channel.New(ctx, channel.ServiceConfig{
 		HostResolver: core1.Cluster,
 		ClusterDB:    core1.Storage.Gorpify(),
-		TSChannel:    core1.Storage.TS,
+		Storage:      core1.Storage.TS,
 		Transport:    net.New(core1.Config.AdvertiseAddress),
 	}))
 	services[2] = MustSucceed(channel.New(ctx, channel.ServiceConfig{
 		HostResolver: core2.Cluster,
 		ClusterDB:    core2.Storage.Gorpify(),
-		TSChannel:    core2.Storage.TS,
+		Storage:      core2.Storage.TS,
 		Transport:    net.New(core2.Config.AdvertiseAddress),
 	}))
 	Eventually(func(g Gomega) {

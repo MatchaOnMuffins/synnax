@@ -57,7 +57,7 @@ func provision(n int) (*mock.CoreBuilder, map[core.NodeKey]serviceContainer) {
 		container.channel = MustSucceed(channel.New(ctx, channel.ServiceConfig{
 			HostResolver: c.Cluster,
 			ClusterDB:    c.Storage.Gorpify(),
-			TSChannel:    c.Storage.TS,
+			Storage:      c.Storage.TS,
 			Transport:    channelNet.New(c.Config.AdvertiseAddress),
 		}))
 		container.writer = MustSucceed(writer.OpenService(writer.ServiceConfig{

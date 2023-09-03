@@ -45,12 +45,13 @@ func (w *Writer) Write(series telem.Series) (int64, error) {
 	if err := w.validate(series); err != nil {
 		return 0, err
 	}
+	alignment := w.numWritten + int64(w.start)
 	w.numWritten += series.Len()
 	if w.Channel.IsIndex {
 		w.updateHwm(series)
 	}
 	_, err := w.internal.Write(series.Data)
-	return w.numWritten, err
+	return alignment, err
 }
 
 func (w *Writer) updateHwm(series telem.Series) {

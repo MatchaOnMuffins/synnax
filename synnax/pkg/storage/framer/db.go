@@ -9,6 +9,7 @@
 package framer
 
 import (
+	"context"
 	"github.com/synnaxlabs/alamos"
 	"github.com/synnaxlabs/cesium"
 	"github.com/synnaxlabs/synnax/pkg/storage/control"
@@ -68,6 +69,10 @@ type DB struct {
 	relay    *relay
 }
 
+func (db *DB) CreateChannel(ctx context.Context, ch ...Channel) error {
+	return db.internal.CreateChannel(ctx, ch...)
+}
+
 func (db *DB) OpenIterator(cfg IteratorConfig) (*Iterator, error) {
 	return db.internal.OpenIterator(cfg)
 }
@@ -81,7 +86,7 @@ func Open(configs ...Config) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db := &DB{relay: newRelay(cfg)}
+	db := &DB{relay: openRelay(cfg)}
 	db.internal, err = cesium.Open(
 		cfg.Dirname,
 		cesium.WithFS(cfg.FS),

@@ -38,7 +38,7 @@ func WithCancel(ctx context.Context, opts ...Option) (Context, context.CancelFun
 // timeout. If any goroutine returns a non-nil error, the Context will be canceled.
 func WithTimeout(ctx context.Context, d time.Duration, opts ...Option) (Context, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(ctx, d)
-	c := newCore(ctx, cancel)
+	c := newCore(ctx, cancel, opts...)
 	return c, cancel
 }
 

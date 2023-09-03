@@ -13,7 +13,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/synnaxlabs/cesium/internal/core"
 	"github.com/synnaxlabs/cesium/internal/unary"
-	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"strconv"
 )
 
@@ -32,7 +31,6 @@ func Open(dirname string, opts ...Option) (*DB, error) {
 	_db := &DB{
 		options: o,
 		dbs:     make(map[core.ChannelKey]unary.DB, len(info)),
-		relay:   framer.newRelay(o),
 	}
 	for _, i := range info {
 		key := core.ChannelKey(lo.Must(strconv.Atoi(i.Name())))

@@ -52,7 +52,7 @@ func provision(n int) (*mock.CoreBuilder, map[core.NodeKey]serviceContainer) {
 			HostResolver: c.Cluster,
 			ClusterDB:    c.Storage.Gorpify(),
 			Transport:    channelNet.New(c.Config.AdvertiseAddress),
-			TSChannel:    c.Storage.TS,
+			Storage:      c.Storage.TS,
 		}))
 		cont.iter = MustSucceed(iterator.OpenService(iterator.ServiceConfig{
 			Storage:       c.Storage.TS,

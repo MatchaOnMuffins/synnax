@@ -91,7 +91,7 @@ func Open(ctx context.Context, cfg Config) (d Distribution, err error) {
 	d.Channel, err = channel.New(ctx, channel.ServiceConfig{
 		HostResolver: d.Cluster,
 		ClusterDB:    gorpDB,
-		TSChannel:    d.Storage.TS,
+		Storage:      d.Storage.TS,
 		Transport:    channelTransport,
 		Ontology:     d.Ontology,
 		Group:        d.Group,

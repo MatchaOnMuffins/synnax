@@ -85,7 +85,7 @@ func (lp *leaseProxy) createLocal(ctx context.Context, tx gorp.Tx, channels *[]C
 		}
 	}
 	storageChannels := toStorage(*channels)
-	if err := lp.TSChannel.CreateChannel(ctx, storageChannels...); err != nil {
+	if err := lp.Storage.CreateChannel(ctx, storageChannels...); err != nil {
 		return err
 	}
 	if err := gorp.NewCreate[Key, Channel]().Entries(channels).Exec(ctx, tx); err != nil {

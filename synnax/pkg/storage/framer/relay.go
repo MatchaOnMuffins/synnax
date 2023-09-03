@@ -10,7 +10,6 @@
 package framer
 
 import (
-	"github.com/synnaxlabs/cesium"
 	"io"
 
 	"github.com/synnaxlabs/x/address"
@@ -19,14 +18,14 @@ import (
 )
 
 type relay struct {
-	delta    *confluence.DynamicDeltaMultiplier[cesium.Frame]
-	inlet    confluence.Inlet[cesium.Frame]
+	delta    *confluence.DynamicDeltaMultiplier[Frame]
+	inlet    confluence.Inlet[Frame]
 	shutdown io.Closer
 }
 
-func newRelay(cfg Config) *relay {
+func openRelay(cfg Config) *relay {
 	sCtx, cancel := signal.Isolated(signal.WithInstrumentation(cfg.Instrumentation))
-	delta := confluence.NewDynamicDeltaMultiplier[cesium.Frame]()
+	delta := confluence.NewDynamicDeltaMultiplier[Frame]()
 	frames := confluence.NewStream[Frame](1)
 	delta.InFrom(frames)
 	delta.Flow(sCtx)
@@ -37,15 +36,15 @@ func newRelay(cfg Config) *relay {
 	}
 }
 
-func (r *relay) connect(buffer int) (confluence.Outlet[cesium.Frame], func()) {
-	frames := confluence.NewStream[cesium.Frame](buffer)
+func (r *relay) connect(buffer int) (confluence.Outlet[Frame], func()) {
+	frames := confluence.NewStream[Frame](buffer)
 	frames.SetInletAddress(address.Rand())
 	r.delta.Connect(frames)
 	return frames, func() {
 		r.delta.Disconnect(frames)
 		// We need to make sure we drain any remaining frames before exiting to
 		// avoid blocking the relay.
-		confluence.Drain[cesium.Frame](frames)
+		confluence.Drain[Frame](frames)
 	}
 }
 

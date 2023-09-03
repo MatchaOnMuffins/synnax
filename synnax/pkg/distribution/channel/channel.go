@@ -14,7 +14,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/synnaxlabs/synnax/pkg/distribution/core"
 	"github.com/synnaxlabs/synnax/pkg/distribution/ontology"
-	"github.com/synnaxlabs/synnax/pkg/storage/ts"
+	"github.com/synnaxlabs/synnax/pkg/storage/framer"
 	"github.com/synnaxlabs/x/telem"
 	"github.com/synnaxlabs/x/unsafe"
 	"strconv"
@@ -94,7 +94,7 @@ func KeysFromOntologyIDs(ids []ontology.ID) (keys Keys, err error) {
 }
 
 // Storage calls Key.StorageKey() on each key and returns a slice with the results.
-func (k Keys) Storage() []ts.ChannelKey { return k.Uint32() }
+func (k Keys) Storage() []framer.ChannelKey { return k.Uint32() }
 
 // Uint32 converts the Keys to a slice of uint32.
 func (k Keys) Uint32() []uint32 { return unsafe.ConvertSlice[Key, uint32](k) }
@@ -194,8 +194,8 @@ func (c Channel) SetOptions() []interface{} { return []interface{}{c.Lease()} }
 // Lease implements the proxy.UnaryServer interface.
 func (c Channel) Lease() core.NodeKey { return c.Leaseholder }
 
-func (c Channel) Storage() ts.Channel {
-	return ts.Channel{
+func (c Channel) Storage() framer.Channel {
+	return framer.Channel{
 		Key:      uint32(c.Key()),
 		DataType: c.DataType,
 		IsIndex:  c.IsIndex,
@@ -204,8 +204,8 @@ func (c Channel) Storage() ts.Channel {
 	}
 }
 
-func toStorage(channels []Channel) []ts.Channel {
-	return lo.Map(channels, func(channel Channel, _ int) ts.Channel {
+func toStorage(channels []Channel) []framer.Channel {
+	return lo.Map(channels, func(channel Channel, _ int) framer.Channel {
 		return channel.Storage()
 	})
 }

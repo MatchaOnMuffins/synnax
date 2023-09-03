@@ -71,7 +71,7 @@ func (b *Builder) New(ctx context.Context) distribution.Distribution {
 	d.Channel = lo.Must(channel.New(ctx, channel.ServiceConfig{
 		HostResolver: d.Cluster,
 		ClusterDB:    d.Storage.Gorpify(),
-		TSChannel:    d.Storage.TS,
+		Storage:      d.Storage.TS,
 		Transport:    b.channelNet.New(d.Config.AdvertiseAddress),
 		Ontology:     d.Ontology,
 		Group:        d.Group,

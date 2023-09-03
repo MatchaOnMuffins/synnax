@@ -12,7 +12,9 @@ package signal
 import (
 	"context"
 	"fmt"
+	"github.com/cockroachdb/errors"
 	"github.com/synnaxlabs/alamos"
+	"github.com/synnaxlabs/x/errutil"
 	"go.uber.org/zap"
 	"runtime/pprof"
 	"strconv"
@@ -57,9 +59,14 @@ const (
 // Defer attaches the provided function f to the routine. The function will be
 // executed on routine exit in LIFO style.
 func Defer(f func(), opts ...RoutineOption) RoutineOption {
+	return DeferErr(func() error { f(); return nil }, opts...)
+}
+
+func DeferErr(f func() error, opts ...RoutineOption) RoutineOption {
 	o := newRoutineOptions(opts)
 	return func(r *routineOptions) {
-		r.deferrals = append(r.deferrals, deferral{key: o.key, f: f})
+		d := deferral{key: o.key, f: f}
+		r.deferrals = append(r.deferrals, d)
 	}
 }
 
@@ -73,7 +80,7 @@ func WithKeyf(format string, args ...interface{}) RoutineOption {
 
 type deferral struct {
 	key string
-	f   func()
+	f   func() error
 }
 
 // CancelOnExit defines if the routine should cancel the context upon exiting.
@@ -161,7 +168,7 @@ func (r *routine) runPrelude() (ctx context.Context, proceed bool) {
 	return ctx, true
 }
 
-func (r *routine) runPostlude(err error) {
+func (r *routine) runPostlude(err error) error {
 	r.maybeRecover()
 	defer r.maybeRecover()
 
@@ -172,16 +179,18 @@ func (r *routine) runPostlude(err error) {
 	r.ctx.mu.Unlock()
 
 	for i := range r.deferrals {
-		r.deferrals[len(r.deferrals)-i-1].f()
+		c := errutil.NewCatch(errutil.WithAggregation())
+		c.Exec(r.deferrals[len(r.deferrals)-i-1].f)
+		err = errors.CombineErrors(err, c.Error())
 	}
 
 	r.ctx.mu.Lock()
 	defer r.ctx.mu.Unlock()
 
 	if err != nil {
-		_ = r.span.Error(err, context.Canceled)
+		_ = r.span.Error(err /* exclude */, context.Canceled)
 		// Only non-context errors are considered failures.
-		if err == context.Canceled || err == context.DeadlineExceeded {
+		if errors.IsAny(err, context.Canceled, context.DeadlineExceeded) {
 			r.state.state = ContextCanceled
 		} else {
 			r.state.state = Failed
@@ -205,6 +214,8 @@ func (r *routine) runPostlude(err error) {
 	r.ctx.maybeStop()
 
 	r.ctx.L.Debug("routine stopped", r.zapFields()...)
+
+	return err
 }
 
 func (r *routine) maybeRecover() {
@@ -244,9 +255,9 @@ func (r *routine) goRun(f func(context.Context) error) {
 	if ctx, proceed := r.runPrelude(); proceed {
 		pprof.Do(ctx, pprof.Labels("routine", r.key), func(ctx context.Context) {
 			r.ctx.internal.Go(func() (err error) {
-				defer func() { r.runPostlude(err) }()
+				defer func() { err = r.runPostlude(err) }()
 				err = f(ctx)
-				return err
+				return
 			})
 		})
 	}

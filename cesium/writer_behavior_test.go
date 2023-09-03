@@ -24,7 +24,7 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 	AfterAll(func() { Expect(db.Close()).To(Succeed()) })
 	Describe("Happy Path", func() {
 		Context("Indexed", func() {
-			Specify("Basic set", func() {
+			Specify("Basic Write", func() {
 				var (
 					basic1      cesium.ChannelKey = 1
 					basic1Index cesium.ChannelKey = 2
@@ -62,6 +62,54 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 				tsFrame := MustSucceed(db.Read(ctx, telem.TimeRangeMax, basic1Index))
 				Expect(tsFrame.Series[0].TimeRange).To(Equal((10 * telem.SecondTS).Range(13*telem.SecondTS + 1)))
 			})
+		})
+		Context("Multiple Indexes", func() {
+			Specify("Basic Writer", func() {
+				var (
+					basic1    cesium.ChannelKey = 3
+					basicIdx1 cesium.ChannelKey = 4
+					basic2    cesium.ChannelKey = 5
+					basicIdx2 cesium.ChannelKey = 6
+				)
+				By("Creating a channel")
+				Expect(db.CreateChannel(
+					ctx,
+					cesium.Channel{Key: basicIdx1, IsIndex: true, DataType: telem.TimeStampT},
+					cesium.Channel{Key: basic1, Index: basicIdx1, DataType: telem.Int64T},
+					cesium.Channel{Key: basicIdx2, IsIndex: true, DataType: telem.TimeStampT},
+					cesium.Channel{Key: basic2, Index: basicIdx2, DataType: telem.Int64T},
+				)).To(Succeed())
+
+				w := MustSucceed(db.OpenWriter(ctx, cesium.WriterConfig{
+					Channels: []cesium.ChannelKey{basic1, basicIdx1, basic2, basicIdx2},
+					Start:    10 * telem.SecondTS,
+				}))
+
+				By("Writing data to the first index")
+				_, ok := w.Write(ctx, cesium.NewFrame(
+					[]cesium.ChannelKey{basicIdx1, basic1},
+					[]telem.Series{
+						telem.NewSecondsTSV(10, 11, 12, 13),
+						telem.NewArrayV[int64](1, 2, 3, 4),
+					},
+				))
+				Expect(ok).To(BeTrue())
+
+				By("Writing more data to the second index")
+				_, ok = w.Write(ctx, cesium.NewFrame(
+					[]cesium.ChannelKey{basicIdx2, basic2},
+					[]telem.Series{
+						telem.NewSecondsTSV(10, 11, 12, 13, 14),
+						telem.NewArrayV[int64](1, 2, 3, 4, 5),
+					},
+				))
+				Expect(ok).To(BeTrue())
+				end, ok := w.Commit(ctx)
+				Expect(ok).To(BeTrue())
+				Expect(end).To(Equal(14*telem.SecondTS + 1))
+				Expect(w.Close()).To(Succeed())
+			})
+
 		})
 	})
 	Describe("Open Errors", func() {
@@ -149,28 +197,6 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
 			Expect(err.Error()).To(ContainSubstring("duplicate channel"))
-		})
-		Specify("Frame with Unknown Channel", func() {
-			w := MustSucceed(db.OpenWriter(
-				ctx,
-				cesium.WriterConfig{
-					Channels: []cesium.ChannelKey{frameErr1, frameErr2},
-					Start:    10 * telem.SecondTS,
-				}))
-			_, ok := w.Write(ctx, cesium.NewFrame(
-				[]cesium.ChannelKey{frameErr1, 223},
-				[]telem.Series{
-					telem.NewArrayV[int64](1, 2, 3, 4),
-					telem.NewArrayV[int64](1, 2, 3, 4),
-				},
-			))
-			Expect(ok).To(BeFalse())
-			_, ok = w.Commit(ctx)
-			Expect(ok).To(BeFalse())
-			err := w.Close()
-			Expect(err).To(MatchError(validate.Error))
-			Expect(err.Error()).To(ContainSubstring("223"))
-			Expect(err.Error()).To(ContainSubstring("not specified"))
 		})
 	})
 	Describe("Index Errors", func() {

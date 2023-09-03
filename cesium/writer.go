@@ -242,18 +242,18 @@ func (db *DB) openRateIdxWriter(
 
 func (w *idxWriter) Write(ctx context.Context, fr Frame) (Frame, error) {
 	var (
-		l = fr.Series[0].Len()
-		c = 0
+		l int64 = -1
+		c       = 0
 	)
 	w.writeNum++
 	for i, k := range fr.Keys {
 		s, ok := w.internal[k]
 		if !ok {
-			return fr, errors.Wrapf(
-				validate.Error,
-				"writer received series for channel %s that was not specified in the writer config",
-				k,
-			)
+			continue
+		}
+
+		if l == -1 {
+			l = fr.Series[i].Len()
 		}
 
 		if s.count == w.writeNum {
@@ -275,6 +275,10 @@ func (w *idxWriter) Write(ctx context.Context, fr Frame) (Frame, error) {
 				fr.Series[i].Len(),
 			)
 		}
+	}
+
+	if c == 0 {
+		return fr, nil
 	}
 
 	if c != len(w.internal) {

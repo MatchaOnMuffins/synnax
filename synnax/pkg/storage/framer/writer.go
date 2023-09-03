@@ -35,13 +35,13 @@ func (db *DB) OpenWriter(ctx context.Context, cfg WriterConfig) (*Writer, error)
 	return &Writer{internal: internal, gate: g}, nil
 }
 
-func (w *Writer) Write(ctx context.Context, alignedFr Frame) bool {
-	failed := w.gate.Check(alignedFr.Keys)
+func (w *Writer) Write(ctx context.Context, fr Frame) bool {
+	failed := w.gate.Check(fr.Keys)
 	if len(failed) > 0 {
 		w.err = errors.New("write failed - insufficient permissions")
 		return false
 	}
-	alignedFr, ok := w.internal.Write(ctx, alignedFr)
+	alignedFr, ok := w.internal.Write(ctx, fr)
 	if !ok {
 		return false
 	}
@@ -57,6 +57,6 @@ func (w *Writer) Error() error {
 	return errors.CombineErrors(w.err, w.internal.Error())
 }
 
-func (w *Writer) Commit(ctx context.Context) (telem.TimeStamp, error) {
+func (w *Writer) Commit(ctx context.Context) (telem.TimeStamp, bool) {
 	return w.internal.Commit(ctx)
 }

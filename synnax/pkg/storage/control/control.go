@@ -3,13 +3,14 @@ package control
 import (
 	"github.com/synnaxlabs/x/telem"
 	"go/types"
+	"math"
 	"sync"
 )
 
 type Authority uint8
 
 const (
-	Absolute Authority = iota
+	Absolute Authority = math.MaxUint8
 )
 
 type Service[T comparable] struct {
@@ -17,60 +18,84 @@ type Service[T comparable] struct {
 	gates map[*Gate[T]]types.Nil
 }
 
-type Gate[T comparable] struct {
-	svc       *Service[T]
-	timeRange telem.TimeRange
-	channels  map[T]Authority
+func NewService[T comparable]() *Service[T] {
+	return &Service[T]{gates: make(map[*Gate[T]]types.Nil)}
 }
 
-func OpenGate[T comparable](svc *Service[T], tr telem.TimeRange) *Gate[T] {
-	g := &Gate[T]{
-		svc:       svc,
-		timeRange: tr,
-	}
-	svc.Lock()
-	svc.gates[g] = types.Nil{}
-	svc.Unlock()
+type Gate[T comparable] struct {
+	closed    bool
+	svc       *Service[T]
+	timeRange telem.TimeRange
+	entities  map[T]Authority
+}
+
+func (s *Service[T]) OpenGate(tr telem.TimeRange) *Gate[T] {
+	g := &Gate[T]{svc: s, timeRange: tr, entities: make(map[T]Authority)}
+	s.Lock()
+	s.gates[g] = types.Nil{}
+	s.Unlock()
 	return g
 }
 
+const closed = "[control.Gate] - closed"
+
 func (g *Gate[T]) Close() {
 	g.svc.Lock()
+	if g.closed {
+		g.svc.Unlock()
+		panic(closed)
+	}
+	if g.closed {
+		panic(closed)
+	}
 	delete(g.svc.gates, g)
+	g.closed = true
 	g.svc.Unlock()
 }
 
 func (g *Gate[T]) Set(e []T, auth []Authority) {
 	g.svc.Lock()
+	if g.closed {
+		g.svc.Unlock()
+		panic(closed)
+	}
 	for i, key := range e {
-		g.channels[key] = auth[i]
+		g.entities[key] = auth[i]
 	}
 	g.svc.Unlock()
 }
 
 func (g *Gate[T]) Delete(key T) {
 	g.svc.Lock()
-	delete(g.channels, key)
+	if g.closed {
+		g.svc.Unlock()
+		panic(closed)
+	}
+	delete(g.entities, key)
 	g.svc.Unlock()
 }
 
 func (g *Gate[T]) Check(entities []T) (failed []T) {
 	g.svc.RLock()
-	defer g.svc.RUnlock()
+	if g.closed {
+		g.svc.RUnlock()
+		panic("[control.Gate] - closed")
+	}
 	for _, key := range entities {
-		auth, ok := g.channels[key]
+		auth, ok := g.entities[key]
 		if !ok {
 			failed = append(failed, key)
 			continue
 		}
-		for gate, _ := range g.svc.gates {
-			if gate.timeRange.OverlapsWith(g.timeRange) {
-				if gate.channels[key] > auth {
+		for other := range g.svc.gates {
+			if other.timeRange.OverlapsWith(g.timeRange) {
+				if other.entities[key] > auth {
 					failed = append(failed, key)
 					break
 				}
 			}
 		}
 	}
+	g.svc.RUnlock()
 	return
 }

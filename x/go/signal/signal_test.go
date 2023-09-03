@@ -171,6 +171,17 @@ var _ = Describe("Signal", func() {
 			})
 		})
 
+		Describe("DeferErr", func() {
+			It("Should return the error from the deferred function", func() {
+				ctx, cancel := signal.Isolated()
+				defer cancel()
+				ctx.Go(immediatelyReturnNil, signal.DeferErr(func() error {
+					return errors.New("defer failed")
+				}))
+				Expect(ctx.Wait()).To(HaveOccurredAs(errors.New("defer failed")))
+			})
+		})
+
 	})
 
 	Describe("Profiler Labels", func() {

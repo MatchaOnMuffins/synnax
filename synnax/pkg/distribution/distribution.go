@@ -91,7 +91,7 @@ func Open(ctx context.Context, cfg Config) (d Distribution, err error) {
 	d.Channel, err = channel.New(ctx, channel.ServiceConfig{
 		HostResolver: d.Cluster,
 		ClusterDB:    gorpDB,
-		Storage:      d.Storage.TS,
+		Storage:      d.Storage.Framer,
 		Transport:    channelTransport,
 		Ontology:     d.Ontology,
 		Group:        d.Group,
@@ -104,7 +104,7 @@ func Open(ctx context.Context, cfg Config) (d Distribution, err error) {
 	d.Framer, err = framer.Open(framer.Config{
 		Instrumentation: cfg.Instrumentation.Child("framer"),
 		ChannelReader:   d.Channel,
-		Storage:         d.Storage.TS,
+		Storage:         d.Storage.Framer,
 		Transport:       frameTransport,
 		HostResolver:    d.Cluster,
 	})

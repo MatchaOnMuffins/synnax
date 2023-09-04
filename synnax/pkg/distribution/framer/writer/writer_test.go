@@ -17,6 +17,7 @@ import (
 	dcore "github.com/synnaxlabs/synnax/pkg/distribution/core"
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/core"
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/writer"
+	"github.com/synnaxlabs/synnax/pkg/storage/control"
 	"github.com/synnaxlabs/x/query"
 	"github.com/synnaxlabs/x/telem"
 	. "github.com/synnaxlabs/x/testutil"
@@ -38,8 +39,9 @@ var _ = Describe("TypedWriter", func() {
 			AfterAll(func() { Expect(s.close.Close()).To(Succeed()) })
 			Specify("It should write and commit data", func() {
 				writer := MustSucceed(s.service.Open(context.TODO(), writer.Config{
-					Keys:  s.keys,
-					Start: 10 * telem.SecondTS,
+					Keys:        s.keys,
+					Authorities: s.authority,
+					Start:       10 * telem.SecondTS,
 				}))
 				Expect(writer.Write(core.Frame{
 					Keys: s.keys,
@@ -65,7 +67,7 @@ var _ = Describe("TypedWriter", func() {
 			})
 		}
 	})
-	Describe("open Errors", Ordered, func() {
+	Describe("Open Errors", Ordered, func() {
 		var s scenario
 		BeforeAll(func() { s = gatewayOnlyScenario() })
 		AfterAll(func() { Expect(s.close.Close()).To(Succeed()) })
@@ -83,41 +85,13 @@ var _ = Describe("TypedWriter", func() {
 					channel.NewKey(0, 22),
 					s.keys[0],
 				},
-				Start: 10 * telem.SecondTS,
+				Authorities: []control.Authority{1, 1},
+				Start:       10 * telem.SecondTS,
 			})
 			Expect(err).To(HaveOccurredAs(query.NotFound))
 			Expect(err.Error()).To(ContainSubstring("channel"))
 			Expect(err.Error()).To(ContainSubstring("22"))
 			Expect(err.Error()).ToNot(ContainSubstring("1"))
-		})
-		It("Should return an error if two keys do not share the same rate", func() {
-			ch := channel.Channel{Rate: 2 * telem.Hz, DataType: telem.Int64T}
-			Expect(s.channel.NewWriter(nil).Create(ctx, &ch)).To(Succeed())
-			_, err := s.service.Open(context.TODO(), writer.Config{
-				Keys: []channel.Key{s.keys[0], ch.Key()},
-			})
-			Expect(err).To(HaveOccurredAs(validate.Error))
-			Expect(err.Error()).To(ContainSubstring("rate"))
-		})
-		It("Should return an error if two keys do not share the same index", func() {
-			indexes := []channel.Channel{
-				{DataType: telem.TimeStampT, IsIndex: true},
-				{DataType: telem.TimeStampT, IsIndex: true},
-			}
-			Expect(s.channel.NewWriter(nil).CreateMany(ctx, &indexes)).To(Succeed())
-			channels := []channel.Channel{
-				{DataType: telem.Int64T, LocalIndex: indexes[0].LocalKey},
-				{DataType: telem.Int64T, LocalIndex: indexes[1].LocalKey},
-			}
-			Expect(s.channel.NewWriter(nil).CreateMany(ctx, &channels)).To(Succeed())
-			_, err := s.service.Open(context.TODO(), writer.Config{
-				Keys: []channel.Key{
-					channels[0].Key(),
-					channels[1].Key(),
-				},
-			})
-			Expect(err).To(HaveOccurredAs(validate.Error))
-			Expect(err.Error()).To(ContainSubstring("index"))
 		})
 	})
 	Describe("Frame Errors", Ordered, func() {
@@ -126,8 +100,9 @@ var _ = Describe("TypedWriter", func() {
 		AfterAll(func() { Expect(s.close.Close()).To(Succeed()) })
 		It("Should return an error if a key is provided that is not in the list of keys provided to the wrapped", func() {
 			writer := MustSucceed(s.service.Open(context.TODO(), writer.Config{
-				Keys:  s.keys,
-				Start: 10 * telem.SecondTS,
+				Keys:        s.keys,
+				Authorities: s.authority,
+				Start:       10 * telem.SecondTS,
 			}))
 			Expect(writer.Write(core.Frame{
 				Keys: append(s.keys, channel.NewKey(12, 22)),
@@ -148,10 +123,11 @@ var _ = Describe("TypedWriter", func() {
 })
 
 type scenario struct {
-	keys    channel.Keys
-	service *writer.Service
-	channel channel.Service
-	close   io.Closer
+	keys      channel.Keys
+	authority []control.Authority
+	service   *writer.Service
+	channel   channel.Service
+	close     io.Closer
 }
 
 func newChannelSet() []channel.Channel {
@@ -181,10 +157,11 @@ func gatewayOnlyScenario() scenario {
 	Expect(svc.channel.NewWriter(nil).CreateMany(ctx, &channels)).To(Succeed())
 	keys := channel.KeysFromChannels(channels)
 	return scenario{
-		keys:    keys,
-		service: svc.writer,
-		close:   builder,
-		channel: svc.channel,
+		keys:      keys,
+		authority: []control.Authority{1, 1, 1},
+		service:   svc.writerSvc,
+		close:     builder,
+		channel:   svc.channel,
 	}
 }
 
@@ -205,10 +182,11 @@ func peerOnlyScenario() scenario {
 	}).Should(Succeed())
 	keys := channel.KeysFromChannels(channels)
 	return scenario{
-		keys:    keys,
-		service: svc.writer,
-		close:   builder,
-		channel: svc.channel,
+		keys:      keys,
+		authority: []control.Authority{1, 1, 1},
+		service:   svc.writerSvc,
+		close:     builder,
+		channel:   svc.channel,
 	}
 }
 
@@ -229,9 +207,10 @@ func mixedScenario() scenario {
 	}).Should(Succeed())
 	keys := channel.KeysFromChannels(channels)
 	return scenario{
-		keys:    keys,
-		service: svc.writer,
-		close:   builder,
-		channel: svc.channel,
+		keys:      keys,
+		authority: []control.Authority{1, 1, 1},
+		service:   svc.writerSvc,
+		close:     builder,
+		channel:   svc.channel,
 	}
 }

@@ -123,7 +123,7 @@ func (c *receiveCoordinator) openReceiver(
 	keys channel.Keys,
 ) (receiver, error) {
 	if nodeKey == c.HostResolver.HostKey() {
-		sr, err := c.TS.NewStreamer(ctx, framer.StreamerConfig{
+		sr, err := c.Framer.NewStreamer(ctx, framer.StreamerConfig{
 			Channels: keys.Storage(),
 		})
 		if err != nil {

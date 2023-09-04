@@ -45,8 +45,8 @@ Data channel: {data_ch.key}
 """
 )
 
-res_stamps = time_ch.read(r)
-res_data = data_ch.read(r)
+# res_stamps = time_ch.read(r)
+# res_data = data_ch.read(r)
 
-plt.plot(res_stamps, res_data)
-plt.show()
+# plt.plot(res_stamps, res_data)
+# plt.show()

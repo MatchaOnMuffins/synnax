@@ -84,7 +84,7 @@ func Open(configs ...Config) (*Service, error) {
 	})
 	s.relay, err = relay.Open(relay.Config{
 		Instrumentation: cfg.Instrumentation,
-		TS:              cfg.Storage,
+		Framer:          cfg.Storage,
 		HostResolver:    cfg.HostResolver,
 		Transport:       cfg.Transport.Relay(),
 	})

@@ -16,7 +16,7 @@ from alamos import Instrumentation, NOOP
 from synnax.exceptions import QueryError
 from synnax.framer.frame import Frame
 from synnax.framer.adapter import ForwardFrameAdapter, BackwardFrameAdapter
-from synnax.framer.writer import Writer
+from synnax.framer.writer import Writer, WriterAuthority
 from synnax.framer.iterator import Iterator
 from synnax.channel.payload import (
     ChannelParams,
@@ -29,6 +29,7 @@ from synnax.channel.retrieve import ChannelRetriever
 from synnax.channel.payload import normalize_channel_params
 from synnax.framer.streamer import Streamer
 from synnax.telem import TimeRange, CrudeTimeStamp, Series, TimeStamp
+from synnax.control import Authority
 
 
 class FrameClient:
@@ -55,6 +56,7 @@ class FrameClient:
         self,
         start: CrudeTimeStamp,
         params: ChannelParams,
+        authority: WriterAuthority = Authority.DEFAULT,
         strict: bool = False,
         suppress_warnings: bool = False,
     ) -> Writer:
@@ -72,6 +74,7 @@ class FrameClient:
             adapter=adapter,
             client=self.__client,
             strict=strict,
+            authority=authority,
             suppress_warnings=suppress_warnings,
         )
 
@@ -101,6 +104,7 @@ class FrameClient:
         start: CrudeTimeStamp,
         data: ndarray | Series,
         to: ChannelKey | ChannelName,
+        authority: WriterAuthority = Authority.DEFAULT,
         strict: bool = False,
     ) -> TimeStamp:
         """Writes telemetry to the given channel starting at the given timestamp.
@@ -110,9 +114,9 @@ class FrameClient:
         :param data: The telemetry to write to the channel.
         :returns: None.
         """
-        with self.new_writer(start, to, strict=strict) as w:
+        with self.new_writer(start, to, strict=strict, authority=authority) as w:
             w.write(Frame(columns_or_data=[to], series=[Series(data)]))
-            ts, ok = w.commit()
+            ts, = w.commit()
             return ts
 
     @overload

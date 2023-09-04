@@ -26,7 +26,7 @@ type Config struct {
 	alamos.Instrumentation
 	Transport    Transport
 	HostResolver core.HostResolver
-	TS           *framer.DB
+	Framer       *framer.DB
 }
 
 var (
@@ -39,7 +39,7 @@ func (c Config) Override(other Config) Config {
 	c.Instrumentation = override.Zero(c.Instrumentation, other.Instrumentation)
 	c.Transport = override.Nil(c.Transport, other.Transport)
 	c.HostResolver = override.Nil(c.HostResolver, other.HostResolver)
-	c.TS = override.Nil(c.TS, other.TS)
+	c.Framer = override.Nil(c.Framer, other.Framer)
 	return c
 }
 
@@ -48,6 +48,7 @@ func (c Config) Validate() error {
 	v := validate.New("relay")
 	validate.NotNil(v, "Transport", c.Transport)
 	validate.NotNil(v, "HostResolver", c.HostResolver)
+	validate.NotNil(v, "Framer", c.Framer)
 	return v.Error()
 }
 

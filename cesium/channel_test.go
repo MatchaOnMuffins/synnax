@@ -68,4 +68,22 @@ var _ = Describe("Channel", Ordered, func() {
 			),
 		)
 	})
+	Describe("Retrieve", func() {
+		It("Should retrieve a channel by its key", func() {
+			ch := cesium.Channel{Key: 71, Rate: 10 * telem.Hz, DataType: telem.Float64T}
+			Expect(db.CreateChannel(ctx, ch)).To(Succeed())
+			retrieved, err := db.RetrieveChannel(ctx, 71)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(retrieved).To(Equal(ch))
+		})
+		It("Should retrieve multiple channels by their keys", func() {
+			ch := cesium.Channel{Key: 72, Rate: 10 * telem.Hz, DataType: telem.Float64T}
+			Expect(db.CreateChannel(ctx, ch)).To(Succeed())
+			ch2 := cesium.Channel{Key: 73, Rate: 10 * telem.Hz, DataType: telem.Float64T}
+			Expect(db.CreateChannel(ctx, ch2)).To(Succeed())
+			retrieved, err := db.RetrieveChannels(ctx, 72, 73)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(retrieved).To(Equal([]cesium.Channel{ch, ch2}))
+		})
+	})
 })

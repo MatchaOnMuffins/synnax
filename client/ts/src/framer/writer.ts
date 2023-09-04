@@ -18,9 +18,10 @@ import {
 } from "@synnaxlabs/x";
 import { z } from "zod";
 
-import { type KeyOrName, type Params } from "@/channel/payload";
+import { type channel } from "@/channel";
 import { type Retriever } from "@/channel/retriever";
-import { ForwardFrameAdapter } from "@/framer/adapter";
+import { Authority } from "@/control/authority";
+import { ForwardFrameAdapter, type CrudeAuthorities } from "@/framer/adapter";
 import { type CrudeFrame, Frame, frameZ } from "@/framer/frame";
 import { StreamProxy } from "@/framer/streamProxy";
 
@@ -29,11 +30,13 @@ enum Command {
   Write = 1,
   Commit = 2,
   Error = 3,
+  SetAuthorities = 4,
 }
 
 const configZ = z.object({
-  start: TimeStamp.z,
-  keys: z.number().array().optional(),
+  start: TimeStamp.z.optional(),
+  keys: z.number().array(),
+  authorities: Authority.z.array(),
 });
 
 const reqZ = z.object({
@@ -114,21 +117,26 @@ export class Writer {
    */
   static async _open(
     start: CrudeTimeStamp,
-    channels: Params,
+    channels: channel.Params,
+    authorities: CrudeAuthorities,
     retriever: Retriever,
     client: StreamClient,
   ): Promise<Writer> {
-    const adapter = await ForwardFrameAdapter.open(retriever, channels);
+    const adapter = await ForwardFrameAdapter.open(retriever, channels, authorities);
     const stream = await client.stream(Writer.ENDPOINT, reqZ, resZ);
     const writer = new Writer(stream, adapter);
     await writer.execute({
       command: Command.Open,
-      config: { start: new TimeStamp(start), keys: adapter.keys },
+      config: {
+        start: new TimeStamp(start),
+        keys: adapter.keys,
+        authorities: adapter.authorities,
+      },
     });
     return writer;
   }
 
-  async write(channel: KeyOrName, data: NativeTypedArray): Promise<boolean>;
+  async write(channel: channel.KeyOrName, data: NativeTypedArray): Promise<boolean>;
 
   async write(frame: CrudeFrame): Promise<boolean>;
 
@@ -147,13 +155,11 @@ export class Writer {
    * should acknowledge the error by calling the error method or closing the writer.
    */
   async write(
-    frame: CrudeFrame | KeyOrName,
+    frame: CrudeFrame | channel.KeyOrName,
     data?: NativeTypedArray,
   ): Promise<boolean> {
     const isKeyOrName = ["string", "number"].includes(typeof frame);
-    if (isKeyOrName) {
-      frame = new Frame(frame, new Series(data as NativeTypedArray));
-    }
+    if (isKeyOrName) frame = new Frame(frame, new Series(data as NativeTypedArray));
     frame = this.adapter.adapt(new Frame(frame));
     // @ts-expect-error
     this.stream.send({ command: Command.Write, frame: frame.toPayload() });
@@ -182,6 +188,25 @@ export class Writer {
     this.stream.send({ command: Command.Error });
     const res = await this.execute({ command: Command.Error });
     return res.error != null ? decodeError(res.error) : null;
+  }
+
+  async setAuthorities(
+    channels: channel.Params,
+    authorities: CrudeAuthorities,
+  ): Promise<void> {
+    this.adapter.parseAuthorities(authorities);
+    const adapter = await ForwardFrameAdapter.open(
+      this.adapter.retriever,
+      channels,
+      authorities,
+    );
+    await this.execute({
+      command: Command.SetAuthorities,
+      config: {
+        keys: adapter.keys,
+        authorities: adapter.authorities,
+      },
+    });
   }
 
   /**

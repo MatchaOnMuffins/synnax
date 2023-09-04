@@ -27,6 +27,8 @@ const (
 	Commit
 	// Error represents a call to Writer.Error.
 	Error
+	// SetAuthorities represents a call to Writer.SetAuthorities.
+	SetAuthorities
 )
 
 // Request represents a streaming call to a Writer.

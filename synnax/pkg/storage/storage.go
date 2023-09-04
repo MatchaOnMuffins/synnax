@@ -12,7 +12,7 @@
 //
 //  1. A key-value store (implementing the kv.DB interface) for storing cluster wide
 //     metadata.
-//  2. A time-series engine (implementing the Storage interface) for writing frames of
+//  2. A time-series engine (implementing the Store interface) for writing frames of
 //     telemetry.
 //
 // It's important to note that the storage package does NOT manage any sort of
@@ -65,21 +65,21 @@ const (
 
 var tsEngines = []TSEngine{CesiumTS}
 
-// Storage represents a node's local storage. The provided KV and TS engines can be
-// used to read and write data. A Storage must be closed when it is no longer in use.
-type Storage struct {
+// Store represents a node's local storage. The provided KV and Framer engines can be
+// used to read and write data. A Store must be closed when it is no longer in use.
+type Store struct {
 	// Config is the configuration for the storage provided to Open.
 	Config
 	// KV is the key-value store for the node.
 	KV kv.DB
-	// TS is the time-series engine for the node.
-	TS *framer.DB
+	// Framer is the time-series engine for the node.
+	Framer *framer.DB
 	// lock is the lock held on the storage directory.
 	lock io.Closer
 }
 
 // Gorpify returns a gorp.DB that can be used to interact with the storage key-value store.
-func (s *Storage) Gorpify() *gorp.DB {
+func (s *Store) Gorpify() *gorp.DB {
 	return gorp.Wrap(
 		s.KV,
 		gorp.WithEncoderDecoder(&binary.TracingEncoderDecoder{
@@ -90,15 +90,15 @@ func (s *Storage) Gorpify() *gorp.DB {
 	)
 }
 
-// Close closes the Storage, releasing the lock on the storage directory. Close
-// MUST be called when the Storage is no longer in use. The caller must ensure that
-// all processes interacting the Storage have finished before calling Close.
-func (s *Storage) Close() error {
+// Close closes the Store, releasing the lock on the storage directory. Close
+// MUST be called when the Store is no longer in use. The caller must ensure that
+// all processes interacting the Store have finished before calling Close.
+func (s *Store) Close() error {
 	// We execute with aggregation here to ensure that we close all engines and release
 	// the lock regardless if one engine fails to close. This may cause unexpected
 	// behavior in the future, so we need to track it.
 	c := errutil.NewCatch(errutil.WithAggregation())
-	c.Exec(s.TS.Close)
+	c.Exec(s.Framer.Close)
 	c.Exec(s.KV.Close)
 	c.Exec(s.lock.Close)
 	return c.Error()
@@ -107,7 +107,7 @@ func (s *Storage) Close() error {
 // Config is used to configure delta's storage layer.
 type Config struct {
 	alamos.Instrumentation
-	// Dirname defines the root directory the Storage resides. The given directory
+	// Dirname defines the root directory the Store resides. The given directory
 	// shouldn't be used by another process while the node is running.
 	Dirname string
 	// Perm is the file permissions to use for the storage directory.
@@ -166,17 +166,17 @@ func (cfg Config) Report() alamos.Report {
 	}
 }
 
-// Open opens a new Storage with the given Config. Open acquires a lock on the directory
+// Open opens a new Store with the given Config. Open acquires a lock on the directory
 // specified in the Config. If the lock cannot be acquired, Open returns an error.
-// The lock is released when the Storage is/closed. Storage MUST be closed when it is no
+// The lock is released when the Store is/closed. Store MUST be closed when it is no
 // longer in use.
-func Open(cfg Config) (s *Storage, err error) {
+func Open(cfg Config) (s *Store, err error) {
 	cfg, err = config.New(DefaultConfig, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	s = &Storage{Config: cfg}
+	s = &Store{Config: cfg}
 
 	s.L.Info("opening storage", cfg.Report().ZapFields()...)
 
@@ -205,7 +205,7 @@ func Open(cfg Config) (s *Storage, err error) {
 	}
 
 	// Open the time-series engine.
-	if s.TS, err = openFramer(cfg, baseXFS); err != nil {
+	if s.Framer, err = openFramer(cfg, baseXFS); err != nil {
 		err = errors.CombineErrors(err, s.KV.Close())
 		return s, errors.CombineErrors(err, s.lock.Close())
 	}

@@ -7,7 +7,19 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-import { type UnknownRecord } from "@/record";
+import { z } from "zod";
 
-export const copy = <T extends UnknownRecord<T>>(obj: T): T =>
-  JSON.parse(JSON.stringify(obj));
+export class Authority extends Number {
+  static readonly ABSOLUTE = 255;
+  static readonly DEFAULT = 1;
+
+  static readonly z = z.union([
+    z.instanceof(Authority),
+    z
+      .number()
+      .int()
+      .min(0)
+      .max(255)
+      .transform((n) => new Authority(n)),
+  ]);
+}

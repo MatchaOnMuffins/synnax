@@ -22,9 +22,9 @@ import (
 // Core is the foundational primitive for distributed compute in a synnax Cluster. It
 // exposes the following services:
 //
-//  1. Storage.Storage - A time-series storage engine for writing node-local telemetry
+//  1. Store.Store - A time-series storage engine for writing node-local telemetry
 //     frames.
-//  2. Storage.KV - An eventually consistent, key-value store for maintaining cluster
+//  2. Store.KV - An eventually consistent, key-value store for maintaining cluster
 //     wide meta-data and state.
 //  3. Cluster - An API for querying information about the Cluster topology.
 type Core struct {
@@ -34,7 +34,7 @@ type Core struct {
 	// Storage is the storage for the node. The distribution layer replaces the original
 	// key-value store with a distributed key-value store. The caller should NOT call
 	// Close on the storage engine.
-	Storage *storage.Storage
+	Storage *storage.Store
 }
 
 // Open opens a new  core distribution layer. The caller is responsible for closing the

@@ -71,7 +71,7 @@ func (b *Builder) New(ctx context.Context) distribution.Distribution {
 	d.Channel = lo.Must(channel.New(ctx, channel.ServiceConfig{
 		HostResolver: d.Cluster,
 		ClusterDB:    d.Storage.Gorpify(),
-		Storage:      d.Storage.TS,
+		Storage:      d.Storage.Framer,
 		Transport:    b.channelNet.New(d.Config.AdvertiseAddress),
 		Ontology:     d.Ontology,
 		Group:        d.Group,
@@ -79,7 +79,7 @@ func (b *Builder) New(ctx context.Context) distribution.Distribution {
 
 	d.Framer = lo.Must(framer.Open(framer.Config{
 		ChannelReader: d.Channel,
-		Storage:       d.Storage.TS,
+		Storage:       d.Storage.Framer,
 		HostResolver:  d.Cluster,
 		Transport:     trans,
 	}))

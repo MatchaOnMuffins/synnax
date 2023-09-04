@@ -7,7 +7,7 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-// Package writer exposes the Synnax cluster for framed writes as a monolithic data space.
+// Package writerSvc exposes the Synnax cluster for framed writes as a monolithic data space.
 // It provides a Writer interface that automatically handles the distribution of writes
 // across the cluster. It also provides a StreamWriter interface that enables the user to
 // optimize the concurrency of writes by passing requests and receiving responses through
@@ -51,8 +51,8 @@ type Config struct {
 	// telemetry occupying the given timestamp already exists for the provided keys,
 	// the wrapped will fail to open.
 	// [REQUIRED]
-	Start     telem.TimeStamp     `json:"start" msgpack:"start"`
-	Authority []control.Authority `json:"authority" msgpack:"authority"`
+	Start       telem.TimeStamp     `json:"start" msgpack:"start"`
+	Authorities []control.Authority `json:"authorities" msgpack:"authorities"`
 }
 
 type keyAuthority struct {
@@ -63,7 +63,7 @@ type keyAuthority struct {
 func (c Config) authorities() []keyAuthority {
 	authorities := make([]keyAuthority, len(c.Keys))
 	for i, key := range c.Keys {
-		authorities[i] = keyAuthority{Key: key, auth: c.Authority[i]}
+		authorities[i] = keyAuthority{Key: key, auth: c.Authorities[i]}
 	}
 	return authorities
 }
@@ -75,11 +75,11 @@ func newConfigFromAuthorities(start telem.TimeStamp, authorities []keyAuthority)
 		keys[i] = authority.Key
 		auth[i] = authority.auth
 	}
-	return Config{Keys: keys, Start: start, Authority: auth}
+	return Config{Keys: keys, Start: start, Authorities: auth}
 }
 
 func (c Config) toStorage() framer.WriterConfig {
-	return framer.WriterConfig{Channels: c.Keys.Storage(), Start: c.Start, Authority: c.Authority}
+	return framer.WriterConfig{Channels: c.Keys.Storage(), Start: c.Start, Authorities: c.Authorities}
 }
 
 // ServiceConfig is the configuration for opening a Writer or StreamWriter.
@@ -271,7 +271,7 @@ func (s *Service) validateChannelKeys(ctx context.Context, keys channel.Keys) er
 		missing, _ := lo.Difference(keys, channel.KeysFromChannels(entries))
 		return errors.Wrapf(
 			query.NotFound,
-			"[writer] - could not find channels: %v",
+			"[writerSvc] - could not find channels: %v",
 			missing,
 		)
 	}

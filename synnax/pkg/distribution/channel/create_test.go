@@ -52,7 +52,7 @@ var _ = Describe("TypedWriter", Ordered, func() {
 				Expect(ch.Key().LocalKey()).To(Equal(uint16(1)))
 			})
 			It("Should create the channel in the cesium gorpDB", func() {
-				channels, err := builder.Cores[1].Storage.TS.RetrieveChannels(ctx, ch.Key().StorageKey())
+				channels, err := builder.Cores[1].Storage.Framer.RetrieveChannels(ctx, ch.Key().StorageKey())
 				Expect(err).ToNot(HaveOccurred())
 				Expect(channels).To(HaveLen(1))
 				cesiumCH := channels[0]
@@ -68,7 +68,7 @@ var _ = Describe("TypedWriter", Ordered, func() {
 				Expect(ch.Key().LocalKey()).To(Equal(uint16(1)))
 			})
 			It("Should create the channel in the cesium gorpDB", func() {
-				channels, err := builder.Cores[2].Storage.TS.RetrieveChannels(ctx, ch.Key().StorageKey())
+				channels, err := builder.Cores[2].Storage.Framer.RetrieveChannels(ctx, ch.Key().StorageKey())
 				Expect(err).ToNot(HaveOccurred())
 				Expect(channels).To(HaveLen(1))
 				cesiumCH := channels[0]
@@ -76,7 +76,7 @@ var _ = Describe("TypedWriter", Ordered, func() {
 				Expect(cesiumCH.Rate).To(Equal(5 * telem.Hz))
 			})
 			It("Should not create the channel on another nodes cesium", func() {
-				channels, err := builder.Cores[1].Storage.TS.RetrieveChannels(ctx, ch.Key().StorageKey())
+				channels, err := builder.Cores[1].Storage.Framer.RetrieveChannels(ctx, ch.Key().StorageKey())
 				Expect(err).To(HaveOccurred())
 				Expect(channels).To(HaveLen(0))
 			})

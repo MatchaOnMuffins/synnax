@@ -9,9 +9,9 @@ import (
 )
 
 type WriterConfig struct {
-	Start     telem.TimeStamp
-	Channels  []ChannelKey
-	Authority []control.Authority
+	Start       telem.TimeStamp
+	Channels    []ChannelKey
+	Authorities []control.Authority
 }
 
 func (c WriterConfig) cesium() cesium.WriterConfig {
@@ -31,8 +31,8 @@ func (db *DB) OpenWriter(ctx context.Context, cfg WriterConfig) (*Writer, error)
 		return nil, err
 	}
 	g := db.control.OpenGate(cfg.Start.Range(telem.TimeStampMax))
-	g.Set(cfg.Channels, cfg.Authority)
-	return &Writer{internal: internal, gate: g}, nil
+	g.Set(cfg.Channels, cfg.Authorities)
+	return &Writer{internal: internal, gate: g, relay: db.relay}, nil
 }
 
 func (w *Writer) Write(ctx context.Context, fr Frame) bool {
@@ -47,6 +47,10 @@ func (w *Writer) Write(ctx context.Context, fr Frame) bool {
 	}
 	w.relay.inlet.Inlet() <- alignedFr
 	return true
+}
+
+func (w *Writer) SetAuthorities(ctx context.Context, keys []ChannelKey, auth []control.Authority) {
+	w.gate.Set(keys, auth)
 }
 
 func (w *Writer) Close() error {

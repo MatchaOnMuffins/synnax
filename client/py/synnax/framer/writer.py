@@ -22,11 +22,12 @@ from numpy import can_cast as np_can_cast
 from pandas import DataFrame, concat as pd_concat
 
 from synnax import io
-from synnax.channel.payload import ChannelKeys
-from synnax.exceptions import Field, ValidationError, UnexpectedError
+from synnax.channel.payload import ChannelKeys, ChannelKey
+from synnax.exceptions import Field, ValidationError
 from synnax.framer.adapter import ForwardFrameAdapter
 from synnax.framer.frame import Frame, FramePayload
 from synnax.telem import TimeSpan, TimeStamp, CrudeTimeStamp, DataType
+from synnax.control import Authority
 
 
 class _Command(int, Enum):
@@ -39,6 +40,7 @@ class _Command(int, Enum):
 class _Config(Payload):
     keys: ChannelKeys
     start: TimeStamp
+    authority: list[Authority]
 
 
 class _Request(Payload):
@@ -53,6 +55,30 @@ class _Response(Payload):
     error: ExceptionPayload | None
     end: TimeStamp | None
 
+WriterAuthority = Authority | list[Authority] | dict[ChannelKey, Authority]
+
+def parse_authority(authority: WriterAuthority, keys: list[ChannelKey]) -> list[Authority]:
+    if isinstance(authority, Authority):
+        return [authority] * len(keys)
+    elif isinstance(authority, list):
+        if len(authority) != len(keys):
+            raise ValidationError(
+                Field(
+                    "authority",
+                    f"authority must be a single Authority or a list of length {len(keys)}",
+                )
+            )
+        return authority
+    elif isinstance(authority, dict):
+        v = [authority.get(k, Authority.DEFAULT) for k in keys]
+        if len(v) != len(keys):
+            raise ValidationError(
+                Field(
+                    "authority",
+                    f"authority must be a single Authority or a dict with keys {keys}",
+                )
+            )
+        return v
 
 class Writer:
     """CoreWriter is used to write a range of telemetry to a set of channels in time
@@ -98,6 +124,7 @@ class Writer:
     __adapter: ForwardFrameAdapter
     __suppress_warnings: bool = False
     __strict: bool = False
+    __config: _Config
 
     start: CrudeTimeStamp
 
@@ -106,6 +133,7 @@ class Writer:
         start: CrudeTimeStamp,
         client: StreamClient,
         adapter: ForwardFrameAdapter,
+        authority: Authority | list[Authority] | dict[ChannelKey, Authority] = Authority.DEFAULT,
         suppress_warnings: bool = False,
         strict: bool = False,
     ) -> None:
@@ -114,11 +142,16 @@ class Writer:
         self.__suppress_warnings = suppress_warnings
         self.__strict = strict
         self.__stream = client.stream(self.__ENDPOINT, _Request, _Response)
+        keys = self.__adapter.keys
+        self.__config = _Config(
+            keys=keys,
+            start=TimeStamp(self.start),
+            authority=parse_authority(authority, keys),
+        )
         self.__open()
 
     def __open(self):
-        config = _Config(keys=self.__adapter.keys, start=TimeStamp(self.start))
-        self.__stream.send(_Request(command=_Command.OPEN, config=config))
+        self.__stream.send(_Request(command=_Command.OPEN, config=self.__config))
         _, exc = self.__stream.receive()
         if exc is not None:
             raise exc

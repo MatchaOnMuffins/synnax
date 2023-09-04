@@ -18,10 +18,13 @@ import {
 
 import { type KeyOrName, type Params } from "@/channel/payload";
 import { type Retriever, analyzeParams } from "@/channel/retriever";
+import { Authority } from "@/control/authority";
 import { Frame } from "@/framer/frame";
 import { Iterator } from "@/framer/iterator";
 import { Streamer } from "@/framer/streamer";
 import { Writer } from "@/framer/writer";
+
+import { type CrudeAuthorities } from "./adapter";
 
 export class Client {
   private readonly stream: StreamClient;
@@ -51,8 +54,12 @@ export class Client {
    * for more information.
    * @returns a new {@link RecordWriter}.
    */
-  async newWriter(start: CrudeTimeStamp, channels: Params): Promise<Writer> {
-    return await Writer._open(start, channels, this.retriever, this.stream);
+  async newWriter(
+    start: CrudeTimeStamp,
+    channels: Params,
+    authority: CrudeAuthorities = Authority.DEFAULT,
+  ): Promise<Writer> {
+    return await Writer._open(start, channels, authority, this.retriever, this.stream);
   }
 
   async newStreamer(
@@ -75,8 +82,9 @@ export class Client {
     to: KeyOrName,
     start: CrudeTimeStamp,
     data: NativeTypedArray,
+    authority: CrudeAuthorities = Authority.DEFAULT,
   ): Promise<void> {
-    const w = await this.newWriter(start, to);
+    const w = await this.newWriter(start, to, authority);
     try {
       await w.write(to, data);
       if (!(await w.commit())) throw (await w.error()) as Error;

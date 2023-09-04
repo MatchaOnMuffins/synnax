@@ -22,7 +22,7 @@ type Builder struct {
 	// Config is the configuration used to provision new stores.
 	Config storage.Config
 	// Stores is a slice all stores provisioned by the Builder.
-	Stores []*storage.Storage
+	Stores []*storage.Store
 }
 
 // NewBuilder opens a new Builder that provisions stores using the given configuration.
@@ -45,7 +45,7 @@ func NewBuilder(configs ...storage.Config) *Builder {
 }
 
 // New provisions a new store.
-func (b *Builder) New() (store *storage.Storage) {
+func (b *Builder) New() (store *storage.Store) {
 	if *b.Config.MemBacked {
 		store = b.newMemBacked()
 	} else {
@@ -57,7 +57,7 @@ func (b *Builder) New() (store *storage.Storage) {
 
 // Cleanup removes all test data written to disk by the stores provisioned by the Builder.
 // Cleanup should only be called after Close, and is not safe to call concurrently
-// with any other Builder or Storage methods.
+// with any other Builder or Store methods.
 func (b *Builder) Cleanup() error {
 	if *b.Config.MemBacked {
 		return nil
@@ -66,7 +66,7 @@ func (b *Builder) Cleanup() error {
 }
 
 // Close closes all stores provisioned by the Builder. Close is not safe to call concurrently
-// with any other Builder or provisioned Storage methods.
+// with any other Builder or provisioned Store methods.
 func (b *Builder) Close() error {
 	c := errutil.NewCatch(errutil.WithAggregation())
 	for _, store := range b.Stores {
@@ -75,7 +75,7 @@ func (b *Builder) Close() error {
 	return c.Error()
 }
 
-func (b *Builder) newMemBacked() *storage.Storage {
+func (b *Builder) newMemBacked() *storage.Store {
 	store, err := storage.Open(b.Config)
 	if err != nil {
 		panic(err)
@@ -83,7 +83,7 @@ func (b *Builder) newMemBacked() *storage.Storage {
 	return store
 }
 
-func (b *Builder) newFSBacked() *storage.Storage {
+func (b *Builder) newFSBacked() *storage.Store {
 	// open a temporary directory prefixed with ServiceConfig.dirname
 	tempDir, err := os.MkdirTemp(b.Config.Dirname, "delta-test-")
 	if err != nil {

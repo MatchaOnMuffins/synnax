@@ -35,7 +35,7 @@ func TestWriter(t *testing.T) {
 
 type serviceContainer struct {
 	channel   channel.Service
-	writer    *writer.Service
+	writerSvc *writer.Service
 	transport struct {
 		channel channel.Transport
 		writer  writer.Transport
@@ -57,12 +57,12 @@ func provision(n int) (*mock.CoreBuilder, map[core.NodeKey]serviceContainer) {
 		container.channel = MustSucceed(channel.New(ctx, channel.ServiceConfig{
 			HostResolver: c.Cluster,
 			ClusterDB:    c.Storage.Gorpify(),
-			Storage:      c.Storage.TS,
+			Storage:      c.Storage.Framer,
 			Transport:    channelNet.New(c.Config.AdvertiseAddress),
 		}))
-		container.writer = MustSucceed(writer.OpenService(writer.ServiceConfig{
+		container.writerSvc = MustSucceed(writer.OpenService(writer.ServiceConfig{
 			Instrumentation: ins,
-			Storage:         c.Storage.TS,
+			Storage:         c.Storage.Framer,
 			ChannelReader:   container.channel,
 			HostResolver:    c.Cluster,
 			Transport:       writerNet.New(c.Config.AdvertiseAddress /*buffer*/, 10),

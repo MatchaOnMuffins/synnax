@@ -32,7 +32,9 @@ type gatewayWriter struct {
 }
 
 func newGatewayWriter(nodeKey core.NodeKey, writer *framer.Writer) *gatewayWriter {
-	return &gatewayWriter{nodeKey: nodeKey, wrapped: writer}
+	gw := &gatewayWriter{nodeKey: nodeKey, wrapped: writer}
+	gw.Transform = gw.transform
+	return gw
 }
 
 func (w *gatewayWriter) Flow(ctx signal.Context, opts ...confluence.Option) {
@@ -53,6 +55,10 @@ func (w *gatewayWriter) transform(ctx context.Context, in Request) (res Response
 	case Commit:
 		res.End, res.Ack = w.wrapped.Commit(ctx)
 		w.seqNum++
+	case SetAuthorities:
+		w.wrapped.SetAuthorities(ctx, in.Config.Keys.Storage(), in.Config.Authorities)
+		w.seqNum++
+		res.Ack = true
 	}
 	res.SeqNum = w.seqNum
 	res.Command = in.Command

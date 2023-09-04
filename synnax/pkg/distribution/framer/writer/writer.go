@@ -10,7 +10,9 @@
 package writer
 
 import (
+	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	"github.com/synnaxlabs/synnax/pkg/distribution/framer/core"
+	"github.com/synnaxlabs/synnax/pkg/storage/control"
 	"github.com/synnaxlabs/x/confluence"
 	"github.com/synnaxlabs/x/signal"
 	"io"
@@ -60,6 +62,15 @@ func (w *Writer) Commit() bool {
 		}
 	}
 	return false
+}
+
+func (w *Writer) SetAuthorities(keys channel.Keys, authorities []control.Authority) {
+	w.requests.Inlet() <- Request{Command: SetAuthorities, Config: Config{Keys: keys, Authorities: authorities}}
+	for res := range w.responses.Outlet() {
+		if res.Command == SetAuthorities {
+			return
+		}
+	}
 }
 
 func (w *Writer) Error() error {

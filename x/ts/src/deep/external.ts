@@ -7,7 +7,9 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-import { type UnknownRecord } from "@/record";
-
-export const copy = <T extends UnknownRecord<T>>(obj: T): T =>
-  JSON.parse(JSON.stringify(obj));
+export * from "@/deep/copy";
+export * from "@/deep/delete";
+export * from "@/deep/equal";
+export * from "@/deep/key";
+export * from "@/deep/merge";
+export * from "@/deep/partial";

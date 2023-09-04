@@ -136,6 +136,9 @@ export type ParamAnalysisResult =
       actual: Names;
     };
 
+export const isKey = (channel: KeyOrName): channel is Key =>
+  typeof channel === "number";
+
 export const analyzeParams = (channels: Params): ParamAnalysisResult => {
   const normal = toArray(channels) as KeysOrNames;
   if (normal.length === 0) throw new QueryError("No channels provided");

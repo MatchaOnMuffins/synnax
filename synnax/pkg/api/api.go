@@ -49,7 +49,7 @@ type Config struct {
 	Framer        *framer.Service
 	Ontology      *ontology.Ontology
 	Group         *group.Service
-	Storage       *storage.Storage
+	Storage       *storage.Store
 	User          *user.Service
 	Token         *token.Service
 	Authenticator auth.Authenticator

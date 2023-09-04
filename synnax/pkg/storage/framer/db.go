@@ -68,6 +68,20 @@ type DB struct {
 	relay    *relay
 }
 
+func Open(configs ...Config) (*DB, error) {
+	cfg, err := config.New(DefaultConfig, configs...)
+	if err != nil {
+		return nil, err
+	}
+	db := &DB{relay: openRelay(cfg), control: control.NewService[ChannelKey]()}
+	db.internal, err = cesium.Open(
+		cfg.Dirname,
+		cesium.WithFS(cfg.FS),
+		cesium.WithInstrumentation(cfg.Instrumentation),
+	)
+	return db, err
+}
+
 func (db *DB) CreateChannel(ctx context.Context, ch ...Channel) error {
 	return db.internal.CreateChannel(ctx, ch...)
 }
@@ -81,18 +95,4 @@ func (db *DB) Close() error {
 	c.Exec(db.internal.Close)
 	c.Exec(db.relay.close)
 	return c.Error()
-}
-
-func Open(configs ...Config) (*DB, error) {
-	cfg, err := config.New(DefaultConfig, configs...)
-	if err != nil {
-		return nil, err
-	}
-	db := &DB{relay: openRelay(cfg)}
-	db.internal, err = cesium.Open(
-		cfg.Dirname,
-		cesium.WithFS(cfg.FS),
-		cesium.WithInstrumentation(cfg.Instrumentation),
-	)
-	return db, err
 }

@@ -9,11 +9,11 @@
 
 import { type UnknownRecord } from "@/record";
 
-type EqualBase<T extends UnknownRecord<T>> =
+type DeepEqualBase<T extends UnknownRecord<T>> =
   | UnknownRecord<T>
   | (UnknownRecord<T> & { equals: (other: T) => boolean });
 
-export const equal = <T extends EqualBase<T>>(a: T, b: T): boolean => {
+export const equal = <T extends DeepEqualBase<T>>(a: T, b: T): boolean => {
   if ("equals" in a) return a.equals(b);
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);

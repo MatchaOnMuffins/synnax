@@ -8,7 +8,7 @@
 // included in the file licenses/APL.txt.
 
 import { Compare } from "@/compare";
-import { Bounds } from "@/spatial/core";
+import { bounds } from "@/spatial";
 import { type GLBufferController, type GLBufferUsage } from "@/telem/gl";
 import {
   convertDataType,
@@ -58,6 +58,7 @@ export class Series {
   /** The underlying data. */
   private readonly _data: ArrayBufferLike;
   readonly _timeRange?: TimeRange;
+  readonly alignment: number = 0;
   /** A cached minimum value. */
   private _min?: SampleValue;
   /** A cached maximum value. */
@@ -73,6 +74,7 @@ export class Series {
     timeRange?: TimeRange,
     sampleOffset?: SampleValue,
     glBufferUsage: GLBufferUsage = "static",
+    alignment: number = 0,
   ): Series {
     if (length === 0)
       throw new Error("[Series] - cannot allocate an array of length 0");
@@ -83,6 +85,7 @@ export class Series {
       timeRange,
       sampleOffset,
       glBufferUsage,
+      alignment,
     );
     arr.writePos = 0;
     return arr;
@@ -107,6 +110,7 @@ export class Series {
     timeRange?: TimeRange,
     sampleOffset?: SampleValue,
     glBufferUsage: GLBufferUsage = "static",
+    alignment: number = 0,
   ) {
     if (dataType == null && !(data instanceof ArrayBuffer)) {
       this.dataType = new DataType(data);
@@ -117,6 +121,7 @@ export class Series {
         "must provide a data type when constructing a Series from a buffer",
       );
     }
+    this.alignment = alignment;
     this.sampleOffset = sampleOffset ?? 0;
     this._data = data;
     this._timeRange = timeRange;
@@ -214,7 +219,14 @@ export class Series {
     for (let i = 0; i < this.length; i++) {
       data[i] = convertDataType(this.dataType, target, this.data[i], sampleOffset);
     }
-    return new Series(data.buffer, target, this._timeRange, sampleOffset);
+    return new Series(
+      data.buffer,
+      target,
+      this._timeRange,
+      sampleOffset,
+      this.gl.bufferUsage,
+      this.alignment,
+    );
   }
 
   private calcRawMax(): SampleValue {
@@ -260,8 +272,8 @@ export class Series {
   }
 
   /** @returns the bounds of this array. */
-  get bounds(): Bounds {
-    return new Bounds(Number(this.min), Number(this.max));
+  get bounds(): bounds.Bounds {
+    return bounds.construct(Number(this.min), Number(this.max));
   }
 
   private maybeRecomputeMinMax(update: Series): void {

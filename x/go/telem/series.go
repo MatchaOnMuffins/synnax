@@ -17,9 +17,8 @@ type Series struct {
 	// DataType is the data type of the series.
 	DataType DataType `json:"data_type" msgpack:"data_type"`
 	// Data is the underlying binary buffer.
-	Data []byte `json:"data" msgpack:"data"`
-	// Alignment
-	Alignment int64
+	Data      []byte    `json:"data" msgpack:"data"`
+	Alignment Alignment `json:"alignment" msgpack:"alignment"`
 }
 
 // Len returns the number of samples currently in the Series.

@@ -20,7 +20,7 @@ import {
   Synnax,
   Text,
 } from "@synnaxlabs/pluto";
-import { Location } from "@synnaxlabs/x";
+import { location } from "@synnaxlabs/x";
 
 import { Cluster } from "@/cluster";
 import { Controls } from "@/components";
@@ -91,7 +91,7 @@ export const NavTop = (): ReactElement => {
       <Nav.Bar.Start className="delta-main-nav-top__start">
         <Controls className="delta-controls--macos" visibleIfOS="MacOS" />
         {os === "Windows" && (
-          <Logo className="delta-main-nav-top__logo" variant="loader" />
+          <Logo className="delta-main-nav-top__logo" variant="icon" />
         )}
       </Nav.Bar.Start>
       <Nav.Bar.Content
@@ -217,14 +217,14 @@ export interface NavDrawerProps {
   location: Layout.NavdrawerLocation;
 }
 
-export const NavDrawer = ({ location, ...props }: NavDrawerProps): ReactElement => {
-  const { activeItem, onResize, onSelect } = Layout.useNavDrawer(location, NAV_DRAWERS);
+export const NavDrawer = ({ location: l, ...props }: NavDrawerProps): ReactElement => {
+  const { activeItem, onResize, onSelect } = Layout.useNavDrawer(l, NAV_DRAWERS);
   return (
     <Nav.Drawer
-      location={location}
+      location={l}
       className={CSS(
         CSS.B("main-nav-drawer"),
-        CSS.BM("main-nav-drawer", new Location(location).direction.crude)
+        CSS.BM("main-nav-drawer", location.direction(l))
       )}
       activeItem={activeItem}
       onResize={onResize}

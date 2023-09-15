@@ -71,7 +71,7 @@ func (i IteratorConfig) ranger() domain.IteratorConfig {
 	return domain.IteratorConfig{Bounds: i.Bounds}
 }
 
-func (db *DB) NewIterator(cfg IteratorConfig) *Iterator {
+func (db *DB) OpenIterator(cfg IteratorConfig) *Iterator {
 	cfg = DefaultIteratorConfig.Override(cfg)
 	iter := db.Ranger.NewIterator(cfg.ranger())
 	i := &Iterator{

@@ -9,7 +9,7 @@
 
 export * from "@/deep/copy";
 export * from "@/deep/delete";
-export * from "@/deep/equal";
 export * from "@/deep/key";
 export * from "@/deep/merge";
 export * from "@/deep/partial";
+export * from "@/deep/equal";

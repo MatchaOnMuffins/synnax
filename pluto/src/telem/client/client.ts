@@ -60,7 +60,7 @@ export class Proxy implements Client {
   }
 
   private get client(): Client {
-    if (this._client == null) throw new QueryError("Client is not initialized");
+    if (this._client == null) throw new QueryError("No cluster has been connected");
     return this._client;
   }
 
@@ -164,7 +164,10 @@ export class Core implements Client {
       const dynamicBuffs: Record<channel.Key, ReadResponse> = {};
       for (const key of keys) {
         const c = await this.getCache(key);
-        dynamicBuffs[key] = new ReadResponse(c.channel, [c.dynamic.buffer]);
+        dynamicBuffs[key] = new ReadResponse(
+          c.channel,
+          c.dynamic.buffer != null ? [c.dynamic.buffer] : [],
+        );
       }
       handler(dynamicBuffs);
       await this.updateStreamer();

@@ -9,7 +9,7 @@
 
 import { type ReactElement } from "react";
 
-import { type CrudeXY } from "@synnaxlabs/x";
+import { type xy } from "@synnaxlabs/x";
 import { Handle, Position } from "reactflow";
 
 import { Align } from "@/align";
@@ -38,22 +38,18 @@ const Element = ({
 }: Props<ElementProps>): ReactElement => {
   return (
     <div className={CSS(className, CSS.B("tank-pid-element"), CSS.selected(selected))}>
-      {editable && (
-        <>
-          <Handle position={Left} type="source" id="a" style={{ top: "25%" }} />
-          <Handle position={Left} type="source" id="c" style={{ top: "75%" }} />
-          <Handle position={Right} type="source" id="e" style={{ top: "25%" }} />
-          <Handle position={Right} type="source" id="g" style={{ top: "75%" }} />
-          <Handle position={Top} type="source" id="j" />
-          <Handle position={Bottom} type="source" id="l" />
-        </>
-      )}
+      <Handle position={Left} type="source" id="a" style={{ top: "25%" }} />
+      <Handle position={Left} type="source" id="c" style={{ top: "75%" }} />
+      <Handle position={Right} type="source" id="e" style={{ top: "25%" }} />
+      <Handle position={Right} type="source" id="g" style={{ top: "75%" }} />
+      <Handle position={Top} type="source" id="j" />
+      <Handle position={Bottom} type="source" id="l" />
       <Tank {...props}></Tank>
     </div>
   );
 };
 
-const DIMENSIONS_DRAG_SCALE: CrudeXY = { y: 2, x: 0.25 };
+const DIMENSIONS_DRAG_SCALE: xy.Crude = { y: 2, x: 0.25 };
 
 const Form = ({ value, onChange }: FormProps<ElementProps>): ReactElement => {
   const handleWidthChange = (width: number): void =>

@@ -41,7 +41,7 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 				}))
 
 				By("Writing data to the channel")
-				fr, ok := w.Write(ctx, cesium.NewFrame(
+				ok := w.Write(cesium.NewFrame(
 					[]cesium.ChannelKey{basic1Index, basic1},
 					[]telem.Series{
 						telem.NewSecondsTSV(10, 11, 12, 13),
@@ -49,9 +49,7 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 					}),
 				)
 				Expect(ok).To(BeTrue())
-				Expect(fr.Series[0].Alignment).To(Equal(int64(telem.Second * 10)))
-				Expect(fr.Series[1].Alignment).To(Equal(int64(telem.Second * 10)))
-				end, ok := w.Commit(ctx)
+				end, ok := w.Commit()
 				Expect(ok).To(BeTrue())
 				Expect(w.Close()).To(Succeed())
 				Expect(end).To(Equal(13*telem.SecondTS + 1))
@@ -86,7 +84,7 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 				}))
 
 				By("Writing data to the first index")
-				_, ok := w.Write(ctx, cesium.NewFrame(
+				ok := w.Write(cesium.NewFrame(
 					[]cesium.ChannelKey{basicIdx1, basic1},
 					[]telem.Series{
 						telem.NewSecondsTSV(10, 11, 12, 13),
@@ -96,7 +94,7 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 				Expect(ok).To(BeTrue())
 
 				By("Writing more data to the second index")
-				_, ok = w.Write(ctx, cesium.NewFrame(
+				ok = w.Write(cesium.NewFrame(
 					[]cesium.ChannelKey{basicIdx2, basic2},
 					[]telem.Series{
 						telem.NewSecondsTSV(10, 11, 12, 13, 14),
@@ -104,7 +102,7 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 					},
 				))
 				Expect(ok).To(BeTrue())
-				end, ok := w.Commit(ctx)
+				end, ok := w.Commit()
 				Expect(ok).To(BeTrue())
 				Expect(end).To(Equal(14*telem.SecondTS + 1))
 				Expect(w.Close()).To(Succeed())
@@ -143,15 +141,15 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 						Start:    10 * telem.SecondTS,
 					}),
 			)
-			_, ok := w.Write(ctx, cesium.NewFrame(
+			ok := w.Write(cesium.NewFrame(
 				[]cesium.ChannelKey{frameErr1, frameErr2},
 				[]telem.Series{
 					telem.NewArrayV[int64](1, 2, 3, 4),
 					telem.NewArrayV[int64](1, 2, 3),
 				}),
 			)
-			Expect(ok).To(BeFalse())
-			_, ok = w.Commit(ctx)
+			Expect(ok).To(BeTrue())
+			_, ok = w.Commit()
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
@@ -164,14 +162,14 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 					Channels: []cesium.ChannelKey{frameErr1, frameErr2},
 					Start:    10 * telem.SecondTS,
 				}))
-			_, ok := w.Write(ctx, cesium.NewFrame(
+			ok := w.Write(cesium.NewFrame(
 				[]cesium.ChannelKey{frameErr1},
 				[]telem.Series{
 					telem.NewArrayV[int64](1, 2, 3, 4),
 				},
 			))
-			Expect(ok).To(BeFalse())
-			_, ok = w.Commit(ctx)
+			Expect(ok).To(BeTrue())
+			_, ok = w.Commit()
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
@@ -184,15 +182,15 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 					Channels: []cesium.ChannelKey{frameErr1, frameErr2},
 					Start:    10 * telem.SecondTS,
 				}))
-			_, ok := w.Write(ctx, cesium.NewFrame(
+			ok := w.Write(cesium.NewFrame(
 				[]cesium.ChannelKey{frameErr1, frameErr1},
 				[]telem.Series{
 					telem.NewArrayV[int64](1, 2, 3, 4),
 					telem.NewArrayV[int64](1, 2, 3, 4),
 				},
 			))
-			Expect(ok).To(BeFalse())
-			_, ok = w.Commit(ctx)
+			Expect(ok).To(BeTrue())
+			_, ok = w.Commit()
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))
@@ -221,14 +219,14 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 					}))
 
 				By("Writing data to the index correctly")
-				_, ok := w.Write(ctx, cesium.NewFrame(
+				ok := w.Write(cesium.NewFrame(
 					[]cesium.ChannelKey{disc1Index},
 					[]telem.Series{
 						telem.NewSecondsTSV(10, 11, 12, 13),
 					}),
 				)
 				Expect(ok).To(BeTrue())
-				_, ok = w.Commit(ctx)
+				_, ok = w.Commit()
 				Expect(ok).To(BeTrue())
 				Expect(w.Close()).To(Succeed())
 
@@ -239,14 +237,14 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 						Channels: []cesium.ChannelKey{disc1},
 						Start:    10 * telem.SecondTS,
 					}))
-				_, ok = w.Write(ctx, cesium.NewFrame(
+				ok = w.Write(cesium.NewFrame(
 					[]cesium.ChannelKey{disc1},
 					[]telem.Series{
 						telem.NewArrayV[int64](1, 2, 3, 4, 5),
 					},
 				))
 				Expect(ok).To(BeTrue())
-				_, ok = w.Commit(ctx)
+				_, ok = w.Commit()
 				Expect(ok).To(BeFalse())
 				err := w.Close()
 				Expect(err).To(MatchError(cesium.ErrDiscontinuous))
@@ -263,14 +261,14 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 						Channels: []cesium.ChannelKey{disc2},
 						Start:    10 * telem.SecondTS,
 					}))
-				_, ok := w.Write(ctx, cesium.NewFrame(
+				ok := w.Write(cesium.NewFrame(
 					[]cesium.ChannelKey{disc2},
 					[]telem.Series{
 						telem.NewArrayV[int64](1, 2, 3, 4, 5),
 					},
 				))
 				Expect(ok).To(BeTrue())
-				_, ok = w.Commit(ctx)
+				_, ok = w.Commit()
 				Expect(ok).To(BeFalse())
 				Expect(w.Close()).To(MatchError(cesium.ErrDiscontinuous))
 			})
@@ -298,14 +296,14 @@ var _ = Describe("Writer Behavior", Ordered, func() {
 					Channels: []cesium.ChannelKey{dtErr},
 					Start:    15 * telem.SecondTS,
 				}))
-			_, ok := w.Write(ctx, cesium.NewFrame(
+			ok := w.Write(cesium.NewFrame(
 				[]cesium.ChannelKey{dtErr},
 				[]telem.Series{
 					telem.NewArrayV[float64](1, 2, 3, 4, 5),
 				},
 			))
-			Expect(ok).To(BeFalse())
-			_, ok = w.Commit(ctx)
+			Expect(ok).To(BeTrue())
+			_, ok = w.Commit()
 			Expect(ok).To(BeFalse())
 			err := w.Close()
 			Expect(err).To(MatchError(validate.Error))

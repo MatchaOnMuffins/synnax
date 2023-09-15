@@ -7,7 +7,7 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-import { ReactElement, useState } from "react";
+import { type ReactElement, useState } from "react";
 
 import { Icon } from "@synnaxlabs/media";
 import {
@@ -23,13 +23,14 @@ import {
   Align,
   Theming,
   Menu,
+  Text,
 } from "@synnaxlabs/pluto";
 import { nanoid } from "nanoid";
 import { useDispatch } from "react-redux";
 
 import { CSS } from "@/css";
 import { useSelect } from "@/lineplot/selectors";
-import { RuleState, removeRule, setRule } from "@/lineplot/slice";
+import { type RuleState, removeRule, setRule } from "@/lineplot/slice";
 import { Vis } from "@/vis";
 
 export interface AnnotationsProps {
@@ -146,19 +147,19 @@ export const Annotations = ({ layoutKey }: AnnotationsProps): ReactElement => {
   const selectedRule = vis.rules.find((rule) => rule.key === selected);
 
   const emptyContent = (
-    <Align.Center direction="x">
+    <Align.Center direction="x" size="small">
       <Status.Text variant="disabled" hideIcon>
-        No annotations added:
+        No annotations added.
       </Status.Text>
-      <Button.Button
-        variant="outlined"
+      <Text.Link
+        level="p"
         onClick={(e) => {
           e.stopPropagation();
           createRule();
         }}
       >
-        Create a new annotation
-      </Button.Button>
+        Create a new one.
+      </Text.Link>
     </Align.Center>
   );
 

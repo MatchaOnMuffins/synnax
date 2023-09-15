@@ -37,9 +37,9 @@ export const tsConfigPaths = ({ name }: Options): Plugin => {
           replacement: path.resolve(
             tsconfigPath,
             baseUrl,
-            replacement[0].replace("/*", "")
+            replacement[0].replace("/*", ""),
           ),
-        })
+        }),
       );
       const existingAlias = transformExistingAlias(config.resolve?.alias);
       return {
@@ -85,7 +85,7 @@ const readConfig = async (configPath: string): Promise<CompilerOptions> => {
     const { options } = parseJsonConfigFileContent(
       config,
       sys,
-      path.dirname(configPath)
+      path.dirname(configPath),
     );
     return options;
   } catch (error: any) {

@@ -7,13 +7,13 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-// Package writerSvc exposes the Synnax cluster for framed writes as a monolithic data space.
+// Package writer exposes the Synnax cluster for framed writes as a monolithic data space.
 // It provides a Writer interface that automatically handles the distribution of writes
 // across the cluster. It also provides a StreamWriter interface that enables the user to
 // optimize the concurrency of writes by passing requests and receiving responses through
 // a channel (implementing the confluence.Segment interface).
 //
-// As Synnax is in its early stages, the wrapped package still has a number of issues, the
+// As Synnax is in its early stages, the writer package still has a number of issues, the
 // most relevant of which is a lack of proper distributed transaction support. This means
 // that commits that succeed on one node may fail on another. Caveat emptor.
 package writer
@@ -26,14 +26,12 @@ import (
 	"github.com/synnaxlabs/synnax/pkg/distribution/channel"
 	dcore "github.com/synnaxlabs/synnax/pkg/distribution/core"
 	"github.com/synnaxlabs/synnax/pkg/distribution/proxy"
-	"github.com/synnaxlabs/synnax/pkg/storage/control"
-	"github.com/synnaxlabs/synnax/pkg/storage/framer"
+	"github.com/synnaxlabs/synnax/pkg/storage/ts"
 	"github.com/synnaxlabs/x/address"
 	"github.com/synnaxlabs/x/config"
 	"github.com/synnaxlabs/x/confluence"
 	"github.com/synnaxlabs/x/confluence/plumber"
 	"github.com/synnaxlabs/x/override"
-	"github.com/synnaxlabs/x/query"
 	"github.com/synnaxlabs/x/signal"
 	"github.com/synnaxlabs/x/telem"
 	"github.com/synnaxlabs/x/validate"
@@ -49,45 +47,21 @@ type Config struct {
 	Keys channel.Keys `json:"keys" msgpack:"keys"`
 	// Start marks the starting timestamp of the first sample in the first frame. If
 	// telemetry occupying the given timestamp already exists for the provided keys,
-	// the wrapped will fail to open.
+	// the writer will fail to open.
 	// [REQUIRED]
-	Start       telem.TimeStamp     `json:"start" msgpack:"start"`
-	Authorities []control.Authority `json:"authorities" msgpack:"authorities"`
+	Start telem.TimeStamp `json:"start" msgpack:"start"`
 }
 
-type keyAuthority struct {
-	channel.Key
-	auth control.Authority
-}
-
-func (c Config) authorities() []keyAuthority {
-	authorities := make([]keyAuthority, len(c.Keys))
-	for i, key := range c.Keys {
-		authorities[i] = keyAuthority{Key: key, auth: c.Authorities[i]}
-	}
-	return authorities
-}
-
-func newConfigFromAuthorities(start telem.TimeStamp, authorities []keyAuthority) Config {
-	keys := make(channel.Keys, len(authorities))
-	auth := make([]control.Authority, len(authorities))
-	for i, authority := range authorities {
-		keys[i] = authority.Key
-		auth[i] = authority.auth
-	}
-	return Config{Keys: keys, Start: start, Authorities: auth}
-}
-
-func (c Config) toStorage() framer.WriterConfig {
-	return framer.WriterConfig{Channels: c.Keys.Storage(), Start: c.Start, Authorities: c.Authorities}
+func (c Config) toStorage() ts.WriterConfig {
+	return ts.WriterConfig{Channels: c.Keys.Storage(), Start: c.Start}
 }
 
 // ServiceConfig is the configuration for opening a Writer or StreamWriter.
 type ServiceConfig struct {
 	alamos.Instrumentation
-	// Storage is the local time series store to write to.
+	// TS is the local time series store to write to.
 	// [REQUIRED]
-	Storage *framer.DB
+	TS *ts.DB
 	// ChannelReader is used to resolve metadata and routing information for the provided
 	// keys.
 	// [REQUIRED]
@@ -111,8 +85,8 @@ var (
 
 // Validate implements config.Config.
 func (cfg ServiceConfig) Validate() error {
-	v := validate.New("distribution.framer.wrapped")
-	validate.NotNil(v, "Storage", cfg.Storage)
+	v := validate.New("distribution.framer.writer")
+	validate.NotNil(v, "TS", cfg.TS)
 	validate.NotNil(v, "ChannelReader", cfg.ChannelReader)
 	validate.NotNil(v, "HostResolver", cfg.HostResolver)
 	validate.NotNil(v, "Transport", cfg.Transport)
@@ -121,7 +95,7 @@ func (cfg ServiceConfig) Validate() error {
 
 // Override implements config.Config.
 func (cfg ServiceConfig) Override(other ServiceConfig) ServiceConfig {
-	cfg.Storage = override.Nil(cfg.Storage, other.Storage)
+	cfg.TS = override.Nil(cfg.TS, other.TS)
 	cfg.ChannelReader = override.Nil(cfg.ChannelReader, other.ChannelReader)
 	cfg.HostResolver = override.Nil(cfg.HostResolver, other.HostResolver)
 	cfg.Transport = override.Nil(cfg.Transport, other.Transport)
@@ -129,14 +103,14 @@ func (cfg ServiceConfig) Override(other ServiceConfig) ServiceConfig {
 	return cfg
 }
 
-// Service is the central service for the wrapped package, allowing the caller to open
+// Service is the central service for the writer package, allowing the caller to open
 // Writers and StreamWriters for writing data to the cluster.
 type Service struct {
 	ServiceConfig
 	server *server
 }
 
-// OpenService opens the wrapped service using the given configuration. Also binds a server
+// OpenService opens the writer service using the given configuration. Also binds a server
 // to the given transport for receiving writes from other nodes in the cluster.
 func OpenService(configs ...ServiceConfig) (*Service, error) {
 	cfg, err := config.New(DefaultConfig, configs...)
@@ -152,12 +126,12 @@ const (
 	validatorResponsesAddr = address.Address("validatorResponses")
 )
 
-// Open opens a new wrapped using the given configuration. The provided context is used to
-// control the lifetime of goroutines spawned by the wrapped. If the given context is cancelled,
-// the wrapped will immediately abort all pending writes and return an error.
-func (s *Service) Open(ctx context.Context, cfg Config) (*Writer, error) {
+// New opens a new writer using the given configuration. The provided context is used to
+// control the lifetime of goroutines spawned by the writer. If the given context is cancelled,
+// the writer will immediately abort all pending writes and return an error.
+func (s *Service) New(ctx context.Context, cfg Config) (*Writer, error) {
 	sCtx, cancel := signal.WithCancel(ctx, signal.WithInstrumentation(s.Instrumentation))
-	seg, err := s.OpenStream(ctx, cfg)
+	seg, err := s.NewStream(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -174,19 +148,17 @@ func (s *Service) Open(ctx context.Context, cfg Config) (*Writer, error) {
 	}, nil
 }
 
-var _ proxy.Entry = keyAuthority{}
-
-// OpenStream opens a new StreamWriter using the given configuration. The provided context
+// NewStream opens a new StreamWriter using the given configuration. The provided context
 // is only used for opening the stream and is not used for concurrent flow control. The
 // context for managing flow control must be provided to StreamWriter.Flow.
-func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, error) {
+func (s *Service) NewStream(ctx context.Context, cfg Config) (StreamWriter, error) {
 	if err := s.validateChannelKeys(ctx, cfg.Keys); err != nil {
 		return nil, err
 	}
 
 	var (
 		hostKey            = s.HostResolver.HostKey()
-		batch              = proxy.BatchFactory[keyAuthority]{Host: hostKey}.Batch(cfg.authorities())
+		batch              = proxy.BatchFactory[channel.Key]{Host: hostKey}.Batch(cfg.Keys)
 		pipe               = plumber.New()
 		needPeerRouting    = len(batch.Peers) > 0
 		needGatewayRouting = len(batch.Gateway) > 0
@@ -205,7 +177,7 @@ func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, err
 
 	if needPeerRouting {
 		routeBulkheadTo = peerSenderAddr
-		sender, receivers, _receiverAddresses, err := s.openManyPeers(ctx, cfg.Start, batch.Peers)
+		sender, receivers, _receiverAddresses, err := s.openManyPeers(ctx, batch.Peers)
 		if err != nil {
 			return nil, err
 		}
@@ -218,7 +190,7 @@ func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, err
 
 	if needGatewayRouting {
 		routeBulkheadTo = gatewayWriterAddr
-		w, err := s.newGateway(ctx, newConfigFromAuthorities(cfg.Start, batch.Gateway))
+		w, err := s.newGateway(ctx, Config{Start: cfg.Start, Keys: batch.Gateway})
 		if err != nil {
 			return nil, err
 		}
@@ -257,23 +229,21 @@ func (s *Service) OpenStream(ctx context.Context, cfg Config) (StreamWriter, err
 }
 
 func (s *Service) validateChannelKeys(ctx context.Context, keys channel.Keys) error {
-	v := validate.New("distribution.framer.wrapped")
+	v := validate.New("distribution.framer.writer")
 	if validate.NotEmptySlice(v, "keys", keys) {
 		return v.Error()
 	}
-	entries := make([]channel.Channel, 0, len(keys))
-	err := s.ChannelReader.
+	var channels []channel.Channel
+	if err := s.ChannelReader.
 		NewRetrieve().
+		Entries(&channels).
 		WhereKeys(keys...).
-		Entries(&entries).
-		Exec(ctx, nil)
-	if len(entries) != len(keys) {
-		missing, _ := lo.Difference(keys, channel.KeysFromChannels(entries))
-		return errors.Wrapf(
-			query.NotFound,
-			"[writerSvc] - could not find channels: %v",
-			missing,
-		)
+		Exec(ctx, nil); err != nil {
+		return err
 	}
-	return err
+	if len(channels) != len(keys) {
+		missing, _ := lo.Difference(keys, channel.KeysFromChannels(channels))
+		return errors.Wrapf(validate.Error, "missing channels: %v", missing)
+	}
+	return nil
 }

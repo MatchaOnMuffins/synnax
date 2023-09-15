@@ -10,7 +10,7 @@
 import { type Key } from "@/deep/key";
 import { type UnknownRecord } from "@/record";
 
-export const delete_ = <T extends UnknownRecord<T>, D extends number = 5>(
+export const deleteD = <T extends UnknownRecord<T>, D extends number = 5>(
   target: T,
   ...keys: Array<Key<T, D>>
 ): T => {

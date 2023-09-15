@@ -7,4 +7,20 @@
 // License, use of this software will be governed by the Apache License, Version 2.0,
 // included in the file licenses/APL.txt.
 
-export * from "@/encode/encoder";
+package workspace
+
+import (
+	"github.com/google/uuid"
+	"github.com/synnaxlabs/x/gorp"
+)
+
+type Workspace struct {
+	Key  uuid.UUID
+	Name string
+}
+
+var _ gorp.Entry[uuid.UUID] = Workspace{}
+
+func (w Workspace) GorpKey() uuid.UUID { return w.Key }
+
+func (w Workspace) SetOptions() []interface{} { return nil }

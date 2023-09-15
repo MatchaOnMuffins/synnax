@@ -35,7 +35,7 @@ import {
   Mosaic,
   Divider,
 } from "@synnaxlabs/pluto";
-import { type AsyncTermSearcher } from "@synnaxlabs/x";
+import { TimeSpan, type AsyncTermSearcher } from "@synnaxlabs/x";
 import { useDispatch, useStore } from "react-redux";
 
 import { CSS } from "@/css";
@@ -70,7 +70,7 @@ export const Palette = ({
 
   const [mode, setMode] = useState<Mode>("resource");
 
-  const notifications = Status.useNotifications();
+  const notifications = Status.useNotifications({ expiration: TimeSpan.seconds(5) });
 
   const store = useStore() as RootStore;
   const placeLayout = Layout.usePlacer();
@@ -351,6 +351,7 @@ export const CommandListItem = ({
         hovered && CSS.BEM("palette", "item", "hovered"),
         CSS.BEM("palette", "item", "command")
       )}
+      sharp
       {...props}
     >
       {name}

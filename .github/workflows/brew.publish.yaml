@@ -12,6 +12,6 @@ jobs:
               uses: dawidd6/action-homebrew-bump-formula@v3
               with:
                   token: ${{ secrets.HOMEBREW_BUMP_TOKEN }} ## GitHub token (not the default one)
-                  tap: synnaxlabs/homebrew-synnax
+                  tap: MatchaOnMuffins/homebrew-synnax
                   no_fork: true
                   formula: synnax
